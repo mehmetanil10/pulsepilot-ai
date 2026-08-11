@@ -6,8 +6,10 @@ issues, and keep critical actions behind human approval.
 
 ## Current status
 
-Sprint 1 is in progress. The Clean Architecture solution foundation is ready
-and targets .NET 10.
+Sprint 1 is in progress. The .NET 10 Clean Architecture foundation and the core
+domain model are ready. The domain currently covers users, workspaces,
+workspace membership, feedback lifecycle rules, and processing state
+transitions.
 
 ## Solution structure
 
