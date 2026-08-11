@@ -26,6 +26,9 @@ internal sealed class FeedbackConfiguration : IEntityTypeConfiguration<FeedbackE
         builder.HasKey(feedback => feedback.Id)
             .HasName("pk_feedback");
 
+        builder.HasAlternateKey(feedback => new { feedback.WorkspaceId, feedback.Id })
+            .HasName("ak_feedback_workspace_id_id");
+
         builder.Property(feedback => feedback.Id)
             .HasColumnName("id")
             .ValueGeneratedNever();

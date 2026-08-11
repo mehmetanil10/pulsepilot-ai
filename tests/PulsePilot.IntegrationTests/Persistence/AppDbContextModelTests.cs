@@ -21,6 +21,9 @@ public sealed class AppDbContextModelTests
             "workspace_members",
             dbContext.Model.FindEntityType(typeof(WorkspaceMember))?.GetTableName());
         Assert.Equal("feedback", dbContext.Model.FindEntityType(typeof(FeedbackEntity))?.GetTableName());
+        Assert.Equal(
+            "feedback_analyses",
+            dbContext.Model.FindEntityType(typeof(FeedbackAnalysis))?.GetTableName());
     }
 
     [Fact]
@@ -82,6 +85,32 @@ public sealed class AppDbContextModelTests
         Assert.Equal(typeof(string), processingStatus!.GetTypeMapping().Converter?.ProviderClrType);
         Assert.Contains("ix_feedback_workspace_id_created_at", indexNames);
         Assert.Contains("ix_feedback_workspace_id_processing_status", indexNames);
+    }
+
+    [Fact]
+    public void FeedbackAnalysis_UsesStructuredTypesAndWorkspaceScopedUniqueIndex()
+    {
+        using var dbContext = CreateDbContext();
+        var analysisEntity = dbContext.Model.FindEntityType(typeof(FeedbackAnalysis));
+        var category = analysisEntity?.FindProperty(nameof(FeedbackAnalysis.Category));
+        var component = analysisEntity?.FindProperty(nameof(FeedbackAnalysis.Component));
+        var sentiment = analysisEntity?.FindProperty(nameof(FeedbackAnalysis.Sentiment));
+        var confidence = analysisEntity?.FindProperty(nameof(FeedbackAnalysis.Confidence));
+        var uniqueIndex = Assert.Single(
+            analysisEntity!.GetIndexes(),
+            index => index.IsUnique);
+
+        Assert.Equal(typeof(string), category!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal(typeof(string), component!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal(typeof(string), sentiment!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal(5, confidence!.GetPrecision());
+        Assert.Equal(4, confidence.GetScale());
+        Assert.Equal(
+            [nameof(FeedbackAnalysis.WorkspaceId), nameof(FeedbackAnalysis.FeedbackId)],
+            uniqueIndex.Properties.Select(property => property.Name));
+        Assert.Equal(
+            "ux_feedback_analyses_workspace_id_feedback_id",
+            uniqueIndex.GetDatabaseName());
     }
 
     private static AppDbContext CreateDbContext()

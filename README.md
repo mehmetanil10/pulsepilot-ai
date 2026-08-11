@@ -6,10 +6,12 @@ issues, and keep critical actions behind human approval.
 
 ## Current status
 
-Sprint 1 is complete. The .NET 10 Clean Architecture foundation, core domain
-model, PostgreSQL persistence layer, JWT authentication, workspace-isolated
-Feedback CRUD, API observability baseline, Docker development stack, and
-idempotent demo seed are ready. EF Core migrations and Testcontainers-backed API,
+Sprint 1 is complete and Sprint 2 is in progress. The .NET 10 Clean Architecture
+foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
+workspace-isolated Feedback CRUD, API observability baseline, Docker development
+stack, and idempotent demo seed are ready. The AI intelligence foundation now
+includes provider-independent structured analysis contracts and a persisted
+`FeedbackAnalysis` model. EF Core migrations and Testcontainers-backed API,
 repository, and seed integration tests are included.
 
 ## Solution structure
@@ -134,6 +136,20 @@ come from validated token claims and are never accepted from the request body:
 
 Deletion is implemented as a soft delete. The MVP accepts `manual` and `api` as
 creation sources; API enums use camel-case string values.
+
+## AI intelligence foundation
+
+`ILLMClient` defines the provider-independent feedback analysis boundary. Its
+structured result contains category, component, severity, sentiment, summary,
+suggested action, and confidence. Application validation and domain invariants
+reject unsupported enum values, severity outside 1–5, confidence outside 0–1,
+and empty or oversized text before persistence.
+
+`FeedbackAnalysis` stores one current analysis per workspace-scoped feedback.
+Database foreign keys prevent an analysis from referencing feedback in another
+workspace, and PostgreSQL check constraints mirror the structured result rules.
+The real AI provider, retry/timeout policies, and background processing are
+introduced in subsequent Sprint 2 tasks.
 
 ## Database migrations
 

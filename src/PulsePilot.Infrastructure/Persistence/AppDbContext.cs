@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
 
@@ -21,6 +22,8 @@ public sealed class AppDbContext : DbContext, IUnitOfWork
     public DbSet<WorkspaceMember> WorkspaceMembers => Set<WorkspaceMember>();
 
     public DbSet<FeedbackEntity> Feedback => Set<FeedbackEntity>();
+
+    public DbSet<FeedbackAnalysis> FeedbackAnalyses => Set<FeedbackAnalysis>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
