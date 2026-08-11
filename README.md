@@ -33,6 +33,44 @@ dotnet test PulsePilot.sln --configuration Release --no-build
 The integration tests require a running Docker engine and create disposable
 PostgreSQL containers automatically.
 
+## Docker setup
+
+The Sprint 1 stack contains the API and PostgreSQL 17 with pgvector. A one-shot
+migration service must complete successfully before the API starts.
+
+Create the local environment file and replace both placeholder secrets. The JWT
+secret must contain at least 32 random bytes:
+
+```powershell
+Copy-Item .env.example .env
+$secret = [Convert]::ToBase64String(
+  [Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+# Set JWT_SECRET=$secret and choose a PostgreSQL password in .env.
+```
+
+Build and start the stack:
+
+```powershell
+docker compose up --build --detach
+docker compose ps
+Invoke-RestMethod http://localhost:8080/health/ready
+```
+
+Swagger UI is available at `http://localhost:8080/swagger` when the environment
+is `Development`. View logs or stop the stack with:
+
+```powershell
+docker compose logs --follow api
+docker compose down
+```
+
+`docker compose down --volumes` also permanently removes the local PostgreSQL
+data volume.
+
+The API uses JWT bearer authentication and an ephemeral Data Protection provider;
+no cookie-encryption keys or application secrets are written into the image or
+container filesystem.
+
 ## API infrastructure
 
 - FluentValidation validators are discovered automatically from the Application

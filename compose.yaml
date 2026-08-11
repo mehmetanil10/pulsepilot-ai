@@ -1,0 +1,77 @@
+name: ${COMPOSE_PROJECT_NAME:-pulsepilot}
+
+x-api-build: &api-build
+  context: .
+  dockerfile: Dockerfile
+  target: final
+
+x-api-environment: &api-environment
+  ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+  ASPNETCORE_HTTP_PORTS: "8080"
+  ConnectionStrings__Database: >-
+    Host=database;Port=5432;Database=${POSTGRES_DB:-pulsepilot};Username=${POSTGRES_USER:-pulsepilot};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};Include Error Detail=false
+  Jwt__Issuer: ${JWT_ISSUER:-PulsePilot.Api}
+  Jwt__Audience: ${JWT_AUDIENCE:-PulsePilot.Clients}
+  Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
+  Jwt__ExpirationMinutes: ${JWT_EXPIRATION_MINUTES:-60}
+
+services:
+  database:
+    image: pgvector/pgvector:0.8.2-pg17-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-pulsepilot}
+      POSTGRES_USER: ${POSTGRES_USER:-pulsepilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  migration:
+    image: pulsepilot-api:${IMAGE_TAG:-local}
+    build: *api-build
+    environment:
+      <<: *api-environment
+      Database__RunMigrations: "true"
+    depends_on:
+      database:
+        condition: service_healthy
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  api:
+    image: pulsepilot-api:${IMAGE_TAG:-local}
+    pull_policy: never
+    environment:
+      <<: *api-environment
+      Database__RunMigrations: "false"
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+volumes:
+  postgres-data:

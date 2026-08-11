@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
 using PulsePilot.Api.Authentication;
+using PulsePilot.Api.Database;
 using PulsePilot.Api.ErrorHandling;
 using PulsePilot.Api.HealthChecks;
 using PulsePilot.Api.Validation;
@@ -73,6 +74,13 @@ builder.Services.AddHealthChecks()
         tags: ["ready"]);
 
 var app = builder.Build();
+
+if (app.Configuration.GetValue<bool>("Database:RunMigrations"))
+{
+    await app.ApplyDatabaseMigrationsAsync();
+    await app.DisposeAsync();
+    return;
+}
 
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
