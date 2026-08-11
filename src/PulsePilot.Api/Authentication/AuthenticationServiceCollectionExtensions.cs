@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Authentication;
 
 namespace PulsePilot.Api.Authentication;
@@ -36,12 +37,17 @@ public static class AuthenticationServiceCollectionExtensions
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer();
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserContext, HttpCurrentUserContext>();
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
             .Configure<IOptions<JwtOptions>>(ConfigureJwtBearer);
 
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
+                .RequireClaim(TokenClaimNames.Subject)
+                .RequireClaim(TokenClaimNames.WorkspaceId)
+                .RequireClaim(TokenClaimNames.Role, "Admin", "Member")
                 .Build());
 
         return services;

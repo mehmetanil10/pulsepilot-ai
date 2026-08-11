@@ -43,6 +43,38 @@ internal sealed class FeedbackRepository : IFeedbackRepository
             throw new ArgumentOutOfRangeException(nameof(take), "Take must be greater than zero.");
         }
 
+        var query = BuildFilteredQuery(workspaceId, source, processingStatus);
+
+        return await query
+            .OrderByDescending(feedback => feedback.CreatedAt)
+            .ThenByDescending(feedback => feedback.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountAsync(
+        Guid workspaceId,
+        FeedbackSource? source = null,
+        ProcessingStatus? processingStatus = null,
+        CancellationToken cancellationToken = default)
+    {
+        return BuildFilteredQuery(workspaceId, source, processingStatus)
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task AddAsync(
+        FeedbackEntity feedback,
+        CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Feedback.AddAsync(feedback, cancellationToken);
+    }
+
+    private IQueryable<FeedbackEntity> BuildFilteredQuery(
+        Guid workspaceId,
+        FeedbackSource? source,
+        ProcessingStatus? processingStatus)
+    {
         var query = _dbContext.Feedback
             .AsNoTracking()
             .Where(feedback => feedback.WorkspaceId == workspaceId);
@@ -57,18 +89,6 @@ internal sealed class FeedbackRepository : IFeedbackRepository
             query = query.Where(feedback => feedback.ProcessingStatus == processingStatus.Value);
         }
 
-        return await query
-            .OrderByDescending(feedback => feedback.CreatedAt)
-            .ThenByDescending(feedback => feedback.Id)
-            .Skip(skip)
-            .Take(take)
-            .ToListAsync(cancellationToken);
-    }
-
-    public async Task AddAsync(
-        FeedbackEntity feedback,
-        CancellationToken cancellationToken = default)
-    {
-        await _dbContext.Feedback.AddAsync(feedback, cancellationToken);
+        return query;
     }
 }

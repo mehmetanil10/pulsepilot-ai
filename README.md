@@ -7,9 +7,9 @@ issues, and keep critical actions behind human approval.
 ## Current status
 
 Sprint 1 is in progress. The .NET 10 Clean Architecture foundation, core domain
-model, PostgreSQL persistence layer, JWT authentication, and API observability
-baseline are ready. EF Core migrations and Testcontainers-backed API and
-repository integration tests are included.
+model, PostgreSQL persistence layer, JWT authentication, workspace-isolated
+Feedback CRUD, and API observability baseline are ready. EF Core migrations and
+Testcontainers-backed API and repository integration tests are included.
 
 ## Solution structure
 
@@ -57,6 +57,20 @@ and never commit a production secret:
 ```powershell
 $env:Jwt__Secret = "replace-with-a-secure-random-secret"
 ```
+
+## Feedback API
+
+Feedback endpoints require a bearer token. Workspace and creator identifiers
+come from validated token claims and are never accepted from the request body:
+
+- `POST /api/feedback`
+- `GET /api/feedback?page=1&pageSize=20&source=manual&processingStatus=pending`
+- `GET /api/feedback/{id}`
+- `PUT /api/feedback/{id}`
+- `DELETE /api/feedback/{id}`
+
+Deletion is implemented as a soft delete. The MVP accepts `manual` and `api` as
+creation sources; API enums use camel-case string values.
 
 ## Database migrations
 

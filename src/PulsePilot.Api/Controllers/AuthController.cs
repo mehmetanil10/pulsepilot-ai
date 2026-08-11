@@ -1,13 +1,16 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PulsePilot.Api.Authentication;
+using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Authentication;
 
 namespace PulsePilot.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(IAuthService authService) : ControllerBase
+public sealed class AuthController(
+    IAuthService authService,
+    ICurrentUserContext currentUser) : ControllerBase
 {
     [AllowAnonymous]
     [HttpPost("register")]
@@ -41,19 +44,11 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public ActionResult<CurrentUserResponse> GetCurrentUser()
     {
-        if (!Guid.TryParse(User.FindFirst(TokenClaimNames.Subject)?.Value, out var userId)
-            || !Guid.TryParse(
-                User.FindFirst(TokenClaimNames.WorkspaceId)?.Value,
-                out var workspaceId))
-        {
-            return Unauthorized();
-        }
-
         return Ok(new CurrentUserResponse(
-            userId,
+            currentUser.UserId,
             User.FindFirst(TokenClaimNames.Email)?.Value ?? string.Empty,
             User.FindFirst(TokenClaimNames.Name)?.Value ?? string.Empty,
-            workspaceId,
-            User.FindFirst(TokenClaimNames.Role)?.Value ?? string.Empty));
+            currentUser.WorkspaceId,
+            currentUser.Role));
     }
 }

@@ -1,0 +1,233 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using PulsePilot.Application.Authentication;
+using PulsePilot.Application.Feedback;
+using PulsePilot.Domain.Feedback;
+using PulsePilot.Infrastructure.Persistence;
+using PulsePilot.IntegrationTests.Persistence;
+
+namespace PulsePilot.IntegrationTests.Api;
+
+public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
+    : IClassFixture<PostgreSqlFixture>
+{
+    private static readonly JsonSerializerOptions SerializerOptions = CreateSerializerOptions();
+
+    [Fact]
+    public async Task CrudFlow_EnforcesWorkspaceIsolationAndSoftDelete()
+    {
+        await using var factory = new PulsePilotApiFactory(database.ConnectionString);
+        using var ownerClient = await CreateAuthenticatedClientAsync(factory, "owner");
+        using var outsiderClient = await CreateAuthenticatedClientAsync(factory, "outsider");
+        var createCommand = new CreateFeedbackCommand(
+            "Payment problem",
+            "I cannot add my card after the latest update.",
+            FeedbackSource.Manual,
+            "Example Customer",
+            "customer@example.com");
+
+        using var createResponse = await PostAsJsonAsync(
+            ownerClient,
+            "/api/feedback",
+            createCommand);
+        var created = await ReadAsync<FeedbackResponse>(createResponse);
+
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        Assert.NotNull(created);
+        Assert.Equal(ProcessingStatus.Pending, created.ProcessingStatus);
+        Assert.Equal(FeedbackSource.Manual, created.Source);
+        Assert.NotNull(createResponse.Headers.Location);
+
+        using var outsiderGetResponse = await outsiderClient.GetAsync(
+            $"/api/feedback/{created.Id}");
+        using var outsiderDeleteResponse = await outsiderClient.DeleteAsync(
+            $"/api/feedback/{created.Id}");
+
+        Assert.Equal(HttpStatusCode.NotFound, outsiderGetResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, outsiderDeleteResponse.StatusCode);
+
+        var updateCommand = new UpdateFeedbackCommand(
+            "Payment card problem",
+            "Card creation fails after the latest update.",
+            FeedbackSource.Api,
+            "Example Customer",
+            "customer@example.com");
+        using var updateResponse = await PutAsJsonAsync(
+            ownerClient,
+            $"/api/feedback/{created.Id}",
+            updateCommand);
+        var updated = await ReadAsync<FeedbackResponse>(updateResponse);
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        Assert.NotNull(updated);
+        Assert.Equal("Payment card problem", updated.Title);
+        Assert.Equal(FeedbackSource.Api, updated.Source);
+        Assert.Equal(ProcessingStatus.Pending, updated.ProcessingStatus);
+
+        using var getResponse = await ownerClient.GetAsync($"/api/feedback/{created.Id}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+        using var deleteResponse = await ownerClient.DeleteAsync(
+            $"/api/feedback/{created.Id}");
+        using var deletedGetResponse = await ownerClient.GetAsync(
+            $"/api/feedback/{created.Id}");
+        var listAfterDelete = await ownerClient.GetFromJsonAsync<FeedbackListResponse>(
+            "/api/feedback",
+            SerializerOptions);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, deletedGetResponse.StatusCode);
+        Assert.NotNull(listAfterDelete);
+        Assert.Equal(0, listAfterDelete.TotalCount);
+
+        await using var serviceProvider = database.CreateServiceProvider();
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var persistedFeedback = await scope.ServiceProvider
+            .GetRequiredService<AppDbContext>()
+            .Feedback
+            .IgnoreQueryFilters()
+            .SingleAsync(feedback => feedback.Id == created.Id);
+
+        Assert.True(persistedFeedback.IsDeleted);
+        Assert.NotNull(persistedFeedback.DeletedAt);
+    }
+
+    [Fact]
+    public async Task List_AppliesSourceStatusAndPaginationFilters()
+    {
+        await using var factory = new PulsePilotApiFactory(database.ConnectionString);
+        using var client = await CreateAuthenticatedClientAsync(factory, "filters");
+
+        await CreateFeedbackAsync(client, "Manual one", FeedbackSource.Manual);
+        await CreateFeedbackAsync(client, "Manual two", FeedbackSource.Manual);
+        await CreateFeedbackAsync(client, "API one", FeedbackSource.Api);
+
+        var firstPage = await client.GetFromJsonAsync<FeedbackListResponse>(
+            "/api/feedback?source=manual&page=1&pageSize=1",
+            SerializerOptions);
+        var secondPage = await client.GetFromJsonAsync<FeedbackListResponse>(
+            "/api/feedback?source=manual&page=2&pageSize=1",
+            SerializerOptions);
+        var pending = await client.GetFromJsonAsync<FeedbackListResponse>(
+            "/api/feedback?processingStatus=pending&pageSize=10",
+            SerializerOptions);
+
+        Assert.NotNull(firstPage);
+        Assert.Equal(2, firstPage.TotalCount);
+        Assert.Single(firstPage.Items);
+        Assert.All(firstPage.Items, item => Assert.Equal(FeedbackSource.Manual, item.Source));
+
+        Assert.NotNull(secondPage);
+        Assert.Equal(2, secondPage.TotalCount);
+        Assert.Single(secondPage.Items);
+        Assert.NotEqual(firstPage.Items[0].Id, secondPage.Items[0].Id);
+
+        Assert.NotNull(pending);
+        Assert.Equal(3, pending.TotalCount);
+        Assert.All(
+            pending.Items,
+            item => Assert.Equal(ProcessingStatus.Pending, item.ProcessingStatus));
+    }
+
+    [Fact]
+    public async Task Create_RequiresAuthenticationAndValidContent()
+    {
+        await using var factory = new PulsePilotApiFactory(database.ConnectionString);
+        using var anonymousClient = factory.CreateClient();
+        using var authenticatedClient = await CreateAuthenticatedClientAsync(factory, "validation");
+        var invalidCommand = new CreateFeedbackCommand(
+            null,
+            string.Empty,
+            FeedbackSource.Manual,
+            null,
+            "invalid-email");
+
+        using var unauthorizedResponse = await PostAsJsonAsync(
+            anonymousClient,
+            "/api/feedback",
+            invalidCommand);
+        using var validationResponse = await PostAsJsonAsync(
+            authenticatedClient,
+            "/api/feedback",
+            invalidCommand);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorizedResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, validationResponse.StatusCode);
+
+        using var document = JsonDocument.Parse(
+            await validationResponse.Content.ReadAsStreamAsync());
+        var errors = document.RootElement.GetProperty("errors");
+
+        Assert.True(errors.TryGetProperty("Content", out _));
+        Assert.True(errors.TryGetProperty("CustomerEmail", out _));
+    }
+
+    private static async Task<HttpClient> CreateAuthenticatedClientAsync(
+        PulsePilotApiFactory factory,
+        string label)
+    {
+        var client = factory.CreateClient();
+        var registerCommand = new RegisterCommand(
+            $"{label}-{Guid.CreateVersion7():N}@example.com",
+            $"{label} owner",
+            "correct-horse-battery-staple",
+            $"{label} workspace");
+        using var response = await client.PostAsJsonAsync("/api/auth/register", registerCommand);
+        response.EnsureSuccessStatusCode();
+        var authentication = await response.Content.ReadFromJsonAsync<AuthenticationResponse>();
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            authentication!.AccessToken);
+
+        return client;
+    }
+
+    private static async Task CreateFeedbackAsync(
+        HttpClient client,
+        string title,
+        FeedbackSource source)
+    {
+        using var response = await PostAsJsonAsync(
+            client,
+            "/api/feedback",
+            new CreateFeedbackCommand(title, $"{title} content", source, null, null));
+
+        response.EnsureSuccessStatusCode();
+    }
+
+    private static Task<HttpResponseMessage> PostAsJsonAsync<T>(
+        HttpClient client,
+        string requestUri,
+        T value)
+    {
+        return client.PostAsJsonAsync(requestUri, value, SerializerOptions);
+    }
+
+    private static Task<HttpResponseMessage> PutAsJsonAsync<T>(
+        HttpClient client,
+        string requestUri,
+        T value)
+    {
+        return client.PutAsJsonAsync(requestUri, value, SerializerOptions);
+    }
+
+    private static Task<T?> ReadAsync<T>(HttpResponseMessage response)
+    {
+        return response.Content.ReadFromJsonAsync<T>(SerializerOptions);
+    }
+
+    private static JsonSerializerOptions CreateSerializerOptions()
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        options.Converters.Add(
+            new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
+
+        return options;
+    }
+}

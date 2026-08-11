@@ -19,6 +19,12 @@ public interface IFeedbackRepository
         ProcessingStatus? processingStatus = null,
         CancellationToken cancellationToken = default);
 
+    Task<int> CountAsync(
+        Guid workspaceId,
+        FeedbackSource? source = null,
+        ProcessingStatus? processingStatus = null,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(
         FeedbackEntity feedback,
         CancellationToken cancellationToken = default);
