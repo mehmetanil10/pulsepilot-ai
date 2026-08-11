@@ -15,8 +15,9 @@ includes provider-independent structured analysis contracts, a persisted
 Outputs, and pgvector-backed feedback embeddings. A separate database-backed
 worker now claims pending feedback with expiring leases, retries transient
 failures, and atomically persists analysis plus embedding without holding a
-transaction during either AI call. Cosine similarity search is workspace-scoped
-and available through the Feedback API. EF Core migrations and
+transaction during either AI call. Cosine similarity search is workspace-scoped,
+and category/component-aware cluster assignment groups related reports safely
+across concurrent worker replicas. EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
 
@@ -148,11 +149,24 @@ come from validated token claims and are never accepted from the request body:
 Deletion is implemented as a soft delete. The MVP accepts `manual` and `api` as
 creation sources; API enums use camel-case string values.
 
+## Feedback Cluster API
+
+Cluster endpoints require a bearer token and always derive the workspace from
+validated JWT claims:
+
+- `GET /api/clusters?page=1&pageSize=20`
+- `GET /api/clusters/{id}?page=1&pageSize=20`
+
+List results are ordered by active feedback count and recent cluster activity.
+Cluster detail returns paginated, non-deleted feedback members. Cross-workspace
+cluster identifiers return `404`.
+
 ## AI intelligence foundation
 
 `ILLMClient` defines provider-independent structured analysis and embedding
-boundaries. The analysis result contains category, component, severity, sentiment, summary,
-suggested action, and confidence. Application validation and domain invariants
+boundaries. The analysis result contains category, component, severity,
+sentiment, summary, suggested action, and confidence. Application validation and
+domain invariants
 reject unsupported enum values, severity outside 1–5, confidence outside 0–1,
 and empty or oversized text before persistence.
 
@@ -165,6 +179,14 @@ feedback. PostgreSQL's `vector` extension and a cosine HNSW index support neares
 neighbor lookup. The API returns only completed, non-deleted feedback from the
 same workspace whose similarity meets the configured threshold; the source
 embedding must match the feedback's current title and content.
+
+`FeedbackCluster` groups feedback only when semantic similarity meets the
+configured threshold and the structured category and component also match. The
+worker joins the closest existing cluster or creates a new one. PostgreSQL
+workspace advisory locks serialize only the short assignment-and-save section,
+preventing duplicate clusters when worker replicas finish similar feedback at
+the same time; provider calls remain outside the lock. Updating feedback clears
+its stale cluster membership until reprocessing completes.
 
 The Infrastructure adapter uses the official OpenAI .NET SDK and Responses API.
 It requests a strict JSON Schema result, then deserializes and validates the

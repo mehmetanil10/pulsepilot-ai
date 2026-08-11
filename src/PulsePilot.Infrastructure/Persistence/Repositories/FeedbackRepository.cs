@@ -25,6 +25,24 @@ internal sealed class FeedbackRepository : IFeedbackRepository
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<FeedbackEntity>> GetByIdsAsync(
+        Guid workspaceId,
+        IReadOnlyCollection<Guid> feedbackIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(feedbackIds);
+
+        if (feedbackIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.Feedback
+            .Where(feedback => feedback.WorkspaceId == workspaceId
+                && feedbackIds.Contains(feedback.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<FeedbackEntity>> ListAsync(
         Guid workspaceId,
         int skip,

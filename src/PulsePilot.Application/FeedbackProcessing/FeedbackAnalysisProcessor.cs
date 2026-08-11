@@ -3,6 +3,7 @@ using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
+using PulsePilot.Application.Feedback;
 using PulsePilot.Domain.Feedback;
 
 namespace PulsePilot.Application.FeedbackProcessing;
@@ -12,12 +13,16 @@ internal sealed class FeedbackAnalysisProcessor(
     IFeedbackRepository feedbackRepository,
     IFeedbackAnalysisRepository analysisRepository,
     IFeedbackEmbeddingRepository embeddingRepository,
+    IFeedbackClusterRepository clusterRepository,
+    IFeedbackClusterAssignmentLock clusterAssignmentLock,
     ILLMClient llmClient,
     IUnitOfWork unitOfWork,
     IOptions<FeedbackProcessingOptions> options,
+    IOptions<SemanticSearchOptions> semanticSearchOptions,
     TimeProvider timeProvider) : IFeedbackAnalysisProcessor
 {
     private readonly FeedbackProcessingOptions _options = options.Value;
+    private readonly SemanticSearchOptions _semanticSearchOptions = semanticSearchOptions.Value;
 
     public async Task<FeedbackAnalysisProcessResult> ProcessNextAsync(
         CancellationToken cancellationToken = default)
@@ -168,6 +173,24 @@ internal sealed class FeedbackAnalysisProcessor(
         string sourceHash,
         CancellationToken cancellationToken)
     {
+        return await clusterAssignmentLock.ExecuteAsync(
+            item.WorkspaceId,
+            token => CompleteUnderClusterLockAsync(
+                item,
+                analysisResult,
+                embeddingResult,
+                sourceHash,
+                token),
+            cancellationToken);
+    }
+
+    private async Task<bool> CompleteUnderClusterLockAsync(
+        FeedbackProcessingItem item,
+        FeedbackAnalysisResult analysisResult,
+        FeedbackEmbeddingResult embeddingResult,
+        string sourceHash,
+        CancellationToken cancellationToken)
+    {
         var feedback = await feedbackRepository.GetByIdAsync(
             item.WorkspaceId,
             item.FeedbackId,
@@ -238,10 +261,86 @@ internal sealed class FeedbackAnalysisProcessor(
                 analyzedAt);
         }
 
+        await AssignClusterAsync(
+            feedback,
+            item,
+            analysisResult,
+            embeddingResult,
+            analyzedAt,
+            cancellationToken);
+
         feedback.CompleteProcessing(item.ProcessingLeaseId, analyzedAt);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return true;
+    }
+
+    private async Task AssignClusterAsync(
+        PulsePilot.Domain.Feedback.Feedback feedback,
+        FeedbackProcessingItem item,
+        FeedbackAnalysisResult analysisResult,
+        FeedbackEmbeddingResult embeddingResult,
+        DateTimeOffset assignedAt,
+        CancellationToken cancellationToken)
+    {
+        var matches = await embeddingRepository.FindSimilarByVectorAsync(
+            item.WorkspaceId,
+            item.FeedbackId,
+            embeddingResult.Values,
+            analysisResult.Category,
+            analysisResult.Component,
+            _semanticSearchOptions.SimilarityThreshold,
+            _semanticSearchOptions.DefaultLimit,
+            cancellationToken);
+        var existingClusterId = matches
+            .Select(match => match.FeedbackClusterId)
+            .FirstOrDefault(clusterId => clusterId.HasValue);
+        var cluster = existingClusterId.HasValue
+            ? await clusterRepository.GetByIdAsync(
+                item.WorkspaceId,
+                existingClusterId.Value,
+                cancellationToken)
+            : null;
+
+        if (cluster is null)
+        {
+            cluster = FeedbackCluster.Create(
+                item.WorkspaceId,
+                CreateClusterTitle(item.Title, analysisResult.Summary),
+                analysisResult.Category,
+                analysisResult.Component,
+                assignedAt);
+            await clusterRepository.AddAsync(cluster, cancellationToken);
+        }
+
+        feedback.AssignToCluster(cluster.Id, assignedAt);
+
+        var unassignedMatchIds = matches
+            .Where(match => !match.FeedbackClusterId.HasValue)
+            .Select(match => match.FeedbackId)
+            .ToHashSet();
+        var unassignedMatches = await feedbackRepository.GetByIdsAsync(
+            item.WorkspaceId,
+            unassignedMatchIds,
+            cancellationToken);
+
+        foreach (var unassignedMatch in unassignedMatches)
+        {
+            unassignedMatch.AssignToCluster(cluster.Id, assignedAt);
+        }
+
+        cluster.RecordActivity(assignedAt);
+    }
+
+    private static string CreateClusterTitle(string? feedbackTitle, string analysisSummary)
+    {
+        var title = string.IsNullOrWhiteSpace(feedbackTitle)
+            ? analysisSummary.Trim()
+            : feedbackTitle.Trim();
+
+        return title.Length <= FeedbackCluster.MaxTitleLength
+            ? title
+            : title[..FeedbackCluster.MaxTitleLength].TrimEnd();
     }
 
     private async Task<bool> FailAsync(

@@ -11,6 +11,11 @@ public interface IFeedbackRepository
         Guid feedbackId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<FeedbackEntity>> GetByIdsAsync(
+        Guid workspaceId,
+        IReadOnlyCollection<Guid> feedbackIds,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<FeedbackEntity>> ListAsync(
         Guid workspaceId,
         int skip,

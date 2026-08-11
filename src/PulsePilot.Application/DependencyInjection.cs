@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PulsePilot.Application.Authentication;
 using PulsePilot.Application.Feedback;
+using PulsePilot.Application.FeedbackClusters;
 using PulsePilot.Application.FeedbackProcessing;
 
 namespace PulsePilot.Application;
@@ -14,6 +15,7 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining(typeof(DependencyInjection));
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IFeedbackService, FeedbackService>();
+        services.AddScoped<IFeedbackClusterService, FeedbackClusterService>();
         services.AddScoped<IFeedbackAnalysisProcessor, FeedbackAnalysisProcessor>();
         services.AddOptions<FeedbackProcessingOptions>();
         services.AddOptions<SemanticSearchOptions>();

@@ -37,6 +37,8 @@ public sealed class Feedback : AuditableEntity
 
     public Guid WorkspaceId { get; private set; }
 
+    public Guid? FeedbackClusterId { get; private set; }
+
     public Guid CreatedByUserId { get; private set; }
 
     public string? Title { get; private set; }
@@ -115,6 +117,7 @@ public sealed class Feedback : AuditableEntity
         CustomerName = validatedCustomerName;
         CustomerEmail = validatedCustomerEmail;
         ProcessingStatus = ProcessingStatus.Pending;
+        FeedbackClusterId = null;
         ClearProcessingLease();
     }
 
@@ -165,6 +168,27 @@ public sealed class Feedback : AuditableEntity
         return ProcessingStatus == ProcessingStatus.Processing
             && processingLeaseId != Guid.Empty
             && ProcessingLeaseId == processingLeaseId;
+    }
+
+    public void AssignToCluster(Guid feedbackClusterId, DateTimeOffset updatedAt)
+    {
+        EnsureNotDeleted();
+        var validatedClusterId = Guard.NotEmpty(
+            feedbackClusterId,
+            nameof(feedbackClusterId));
+
+        if (FeedbackClusterId == validatedClusterId)
+        {
+            return;
+        }
+
+        if (FeedbackClusterId.HasValue)
+        {
+            throw new DomainException("Feedback is already assigned to another cluster.");
+        }
+
+        MarkUpdated(updatedAt);
+        FeedbackClusterId = validatedClusterId;
     }
 
     public void MarkDeleted(DateTimeOffset deletedAt)

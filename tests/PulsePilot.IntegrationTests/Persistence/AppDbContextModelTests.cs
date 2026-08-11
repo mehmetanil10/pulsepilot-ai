@@ -28,6 +28,9 @@ public sealed class AppDbContextModelTests
         Assert.Equal(
             "feedback_embeddings",
             dbContext.Model.FindEntityType(typeof(FeedbackEmbedding))?.GetTableName());
+        Assert.Equal(
+            "feedback_clusters",
+            dbContext.Model.FindEntityType(typeof(FeedbackCluster))?.GetTableName());
     }
 
     [Fact]
@@ -84,6 +87,8 @@ public sealed class AppDbContextModelTests
             nameof(FeedbackEntity.ProcessingLeaseId));
         var processingStartedAt = feedbackEntity?.FindProperty(
             nameof(FeedbackEntity.ProcessingStartedAt));
+        var feedbackClusterId = feedbackEntity?.FindProperty(
+            nameof(FeedbackEntity.FeedbackClusterId));
         var indexNames = feedbackEntity!
             .GetIndexes()
             .Select(index => index.GetDatabaseName())
@@ -93,9 +98,11 @@ public sealed class AppDbContextModelTests
         Assert.Equal(typeof(string), processingStatus!.GetTypeMapping().Converter?.ProviderClrType);
         Assert.Equal("processing_lease_id", processingLeaseId!.GetColumnName());
         Assert.Equal("processing_started_at", processingStartedAt!.GetColumnName());
+        Assert.Equal("feedback_cluster_id", feedbackClusterId!.GetColumnName());
         Assert.Contains("ix_feedback_workspace_id_created_at", indexNames);
         Assert.Contains("ix_feedback_workspace_id_processing_status", indexNames);
         Assert.Contains("ix_feedback_processing_status_started_at", indexNames);
+        Assert.Contains("ix_feedback_workspace_id_cluster_id", indexNames);
     }
 
     [Fact]
@@ -142,6 +149,24 @@ public sealed class AppDbContextModelTests
         Assert.Equal(
             [nameof(FeedbackEmbedding.WorkspaceId), nameof(FeedbackEmbedding.FeedbackId)],
             uniqueIndex.Properties.Select(property => property.Name));
+    }
+
+    [Fact]
+    public void FeedbackCluster_UsesStructuredClassificationAndTenantScopedKey()
+    {
+        using var dbContext = CreateDbContext();
+        var clusterEntity = dbContext.Model.FindEntityType(typeof(FeedbackCluster));
+        var category = clusterEntity?.FindProperty(nameof(FeedbackCluster.Category));
+        var component = clusterEntity?.FindProperty(nameof(FeedbackCluster.Component));
+        var alternateKey = Assert.Single(
+            clusterEntity!.GetKeys(),
+            key => !key.IsPrimaryKey());
+
+        Assert.Equal(typeof(string), category!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal(typeof(string), component!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal(
+            [nameof(FeedbackCluster.WorkspaceId), nameof(FeedbackCluster.Id)],
+            alternateKey.Properties.Select(property => property.Name));
     }
 
     private static AppDbContext CreateDbContext()

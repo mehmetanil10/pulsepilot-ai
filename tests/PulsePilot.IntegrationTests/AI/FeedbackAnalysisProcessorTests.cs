@@ -68,6 +68,7 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
 
             Assert.Equal(ProcessingStatus.Completed, persistedFeedback.ProcessingStatus);
             Assert.Null(persistedFeedback.ProcessingLeaseId);
+            Assert.NotNull(persistedFeedback.FeedbackClusterId);
             Assert.Equal(FirstResult.Summary, persistedAnalysis.Summary);
             Assert.Equal(FeedbackEmbedding.Dimensions, persistedEmbedding.Values.Count);
             Assert.Equal("integration-test-embedding-model", persistedEmbedding.Model);
@@ -314,6 +315,67 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
             .ToListAsync());
     }
 
+    [Fact]
+    public async Task Processor_ConcurrentSimilarFeedbackUsesSingleWorkspaceCluster()
+    {
+        var (firstFeedback, secondFeedback) = await SeedFeedbackPairAsync(
+            "processor-cluster-concurrency");
+        var fakeClient = new SequenceLlmClient(
+            _ => Task.FromResult(FirstResult),
+            _ => Task.FromResult(FirstResult));
+        await using var serviceProvider = CreateProcessorProvider(fakeClient);
+
+        var results = await Task.WhenAll(
+            ProcessNextAsync(serviceProvider),
+            ProcessNextAsync(serviceProvider));
+
+        Assert.All(
+            results,
+            result => Assert.Equal(FeedbackAnalysisProcessStatus.Succeeded, result.Status));
+
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var feedback = await dbContext.Feedback
+            .Where(entity => entity.Id == firstFeedback.Id || entity.Id == secondFeedback.Id)
+            .OrderBy(entity => entity.Id)
+            .ToListAsync();
+
+        Assert.Equal(2, feedback.Count);
+        Assert.All(feedback, entity => Assert.NotNull(entity.FeedbackClusterId));
+        Assert.Equal(feedback[0].FeedbackClusterId, feedback[1].FeedbackClusterId);
+        Assert.Single(await dbContext.FeedbackClusters
+            .Where(cluster => cluster.WorkspaceId == firstFeedback.WorkspaceId)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task Processor_SimilarVectorsWithDifferentClassificationUseSeparateClusters()
+    {
+        var (firstFeedback, secondFeedback) = await SeedFeedbackPairAsync(
+            "processor-cluster-classification");
+        var fakeClient = new SequenceLlmClient(
+            _ => Task.FromResult(FirstResult),
+            _ => Task.FromResult(UpdatedResult));
+        await using var serviceProvider = CreateProcessorProvider(fakeClient);
+
+        var firstResult = await ProcessNextAsync(serviceProvider);
+        var secondResult = await ProcessNextAsync(serviceProvider);
+
+        Assert.Equal(FeedbackAnalysisProcessStatus.Succeeded, firstResult.Status);
+        Assert.Equal(FeedbackAnalysisProcessStatus.Succeeded, secondResult.Status);
+
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var feedback = await dbContext.Feedback
+            .Where(entity => entity.Id == firstFeedback.Id || entity.Id == secondFeedback.Id)
+            .OrderBy(entity => entity.Id)
+            .ToListAsync();
+
+        Assert.NotEqual(feedback[0].FeedbackClusterId, feedback[1].FeedbackClusterId);
+        Assert.Equal(2, await dbContext.FeedbackClusters
+            .CountAsync(cluster => cluster.WorkspaceId == firstFeedback.WorkspaceId));
+    }
+
     private ServiceProvider CreateProcessorProvider(
         ILLMClient llmClient,
         Action<FeedbackProcessingOptions>? configureOptions = null)
@@ -381,6 +443,55 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
         await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
 
         return feedback;
+    }
+
+    private async Task<(FeedbackEntity First, FeedbackEntity Second)> SeedFeedbackPairAsync(
+        string label)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var user = User.Create(
+            $"{label}-{Guid.CreateVersion7():N}@example.com",
+            "Cluster Owner",
+            "password-hash",
+            now);
+        var workspace = Workspace.Create($"{label} workspace", now);
+        var membership = WorkspaceMember.Join(
+            workspace.Id,
+            user.Id,
+            WorkspaceRole.Admin,
+            now);
+        var firstFeedback = FeedbackEntity.Create(
+            workspace.Id,
+            user.Id,
+            "Card cannot be added",
+            "After the latest update I cannot add my credit card.",
+            FeedbackSource.Manual,
+            null,
+            null,
+            now);
+        var secondFeedback = FeedbackEntity.Create(
+            workspace.Id,
+            user.Id,
+            "Checkout payment fails",
+            "The checkout page fails whenever I submit my payment card.",
+            FeedbackSource.Api,
+            null,
+            null,
+            now.AddMilliseconds(1));
+
+        await using var serviceProvider = database.CreateServiceProvider();
+        await using var scope = serviceProvider.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<IUserRepository>().AddAsync(user);
+        await scope.ServiceProvider.GetRequiredService<IWorkspaceRepository>().AddAsync(workspace);
+        await scope.ServiceProvider
+            .GetRequiredService<IWorkspaceMemberRepository>()
+            .AddAsync(membership);
+        var feedbackRepository = scope.ServiceProvider.GetRequiredService<IFeedbackRepository>();
+        await feedbackRepository.AddAsync(firstFeedback);
+        await feedbackRepository.AddAsync(secondFeedback);
+        await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
+
+        return (firstFeedback, secondFeedback);
     }
 
     private sealed class SequenceLlmClient(

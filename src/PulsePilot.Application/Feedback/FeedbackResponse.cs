@@ -7,6 +7,7 @@ namespace PulsePilot.Application.Feedback;
 public sealed record FeedbackResponse(
     Guid Id,
     Guid WorkspaceId,
+    Guid? FeedbackClusterId,
     Guid CreatedByUserId,
     string? Title,
     string Content,
@@ -22,6 +23,7 @@ public sealed record FeedbackResponse(
         return new FeedbackResponse(
             feedback.Id,
             feedback.WorkspaceId,
+            feedback.FeedbackClusterId,
             feedback.CreatedByUserId,
             feedback.Title,
             feedback.Content,

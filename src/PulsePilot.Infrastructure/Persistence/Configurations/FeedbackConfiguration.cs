@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
 
@@ -44,6 +45,9 @@ internal sealed class FeedbackConfiguration : IEntityTypeConfiguration<FeedbackE
         builder.Property(feedback => feedback.CreatedByUserId)
             .HasColumnName("created_by_user_id")
             .ValueGeneratedNever();
+
+        builder.Property(feedback => feedback.FeedbackClusterId)
+            .HasColumnName("feedback_cluster_id");
 
         builder.Property(feedback => feedback.Title)
             .HasColumnName("title")
@@ -107,6 +111,17 @@ internal sealed class FeedbackConfiguration : IEntityTypeConfiguration<FeedbackE
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("fk_feedback_users_created_by_user_id");
 
+        builder.HasOne<FeedbackCluster>()
+            .WithMany()
+            .HasForeignKey(feedback => new
+            {
+                feedback.WorkspaceId,
+                feedback.FeedbackClusterId,
+            })
+            .HasPrincipalKey(cluster => new { cluster.WorkspaceId, cluster.Id })
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("fk_feedback_clusters_workspace_id_cluster_id");
+
         builder.HasIndex(feedback => new { feedback.WorkspaceId, feedback.CreatedAt })
             .IsDescending(false, true)
             .HasDatabaseName("ix_feedback_workspace_id_created_at");
@@ -123,6 +138,9 @@ internal sealed class FeedbackConfiguration : IEntityTypeConfiguration<FeedbackE
 
         builder.HasIndex(feedback => feedback.CreatedByUserId)
             .HasDatabaseName("ix_feedback_created_by_user_id");
+
+        builder.HasIndex(feedback => new { feedback.WorkspaceId, feedback.FeedbackClusterId })
+            .HasDatabaseName("ix_feedback_workspace_id_cluster_id");
 
         builder.HasQueryFilter(feedback => feedback.DeletedAt == null);
     }

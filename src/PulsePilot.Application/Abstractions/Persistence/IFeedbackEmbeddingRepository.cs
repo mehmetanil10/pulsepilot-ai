@@ -16,6 +16,16 @@ public interface IFeedbackEmbeddingRepository
         int limit,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<SimilarFeedbackMatch>> FindSimilarByVectorAsync(
+        Guid workspaceId,
+        Guid excludedFeedbackId,
+        IReadOnlyList<float> values,
+        FeedbackCategory category,
+        FeedbackComponent component,
+        double minimumSimilarity,
+        int limit,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(
         FeedbackEmbedding embedding,
         CancellationToken cancellationToken = default);
@@ -23,6 +33,7 @@ public interface IFeedbackEmbeddingRepository
 
 public sealed record SimilarFeedbackMatch(
     Guid FeedbackId,
+    Guid? FeedbackClusterId,
     string? Title,
     string Content,
     FeedbackSource Source,

@@ -27,6 +27,8 @@ public sealed class AppDbContext : DbContext, IUnitOfWork
 
     public DbSet<FeedbackEmbedding> FeedbackEmbeddings => Set<FeedbackEmbedding>();
 
+    public DbSet<FeedbackCluster> FeedbackClusters => Set<FeedbackCluster>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

@@ -12,6 +12,7 @@ public sealed record SimilarFeedbackResponse(
 
 public sealed record SimilarFeedbackItemResponse(
     Guid Id,
+    Guid? FeedbackClusterId,
     string? Title,
     string Content,
     FeedbackSource Source,

@@ -168,6 +168,7 @@ public sealed class FeedbackTests
     {
         var feedback = CreateFeedback();
         feedback.StartProcessing(CreatedAt.AddMinutes(1));
+        feedback.AssignToCluster(Guid.CreateVersion7(), CreatedAt.AddMinutes(2));
         feedback.CompleteProcessing(CreatedAt.AddMinutes(2));
 
         feedback.UpdateDetails(
@@ -184,6 +185,22 @@ public sealed class FeedbackTests
         Assert.Equal("Updated customer", feedback.CustomerName);
         Assert.Equal("updated@example.com", feedback.CustomerEmail);
         Assert.Equal(ProcessingStatus.Pending, feedback.ProcessingStatus);
+        Assert.Null(feedback.FeedbackClusterId);
+    }
+
+    [Fact]
+    public void AssignToCluster_IsIdempotentButRejectsReassignment()
+    {
+        var feedback = CreateFeedback();
+        var clusterId = Guid.CreateVersion7();
+
+        feedback.AssignToCluster(clusterId, CreatedAt.AddMinutes(1));
+        feedback.AssignToCluster(clusterId, CreatedAt.AddMinutes(2));
+
+        Assert.Equal(clusterId, feedback.FeedbackClusterId);
+        Assert.Throws<DomainException>(() => feedback.AssignToCluster(
+            Guid.CreateVersion7(),
+            CreatedAt.AddMinutes(3)));
     }
 
     [Fact]

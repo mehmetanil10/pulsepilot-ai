@@ -141,6 +141,7 @@ internal sealed class FeedbackService(
             _semanticSearchOptions.SimilarityThreshold,
             matches.Select(match => new SimilarFeedbackItemResponse(
                 match.FeedbackId,
+                match.FeedbackClusterId,
                 match.Title,
                 match.Content,
                 match.Source,
