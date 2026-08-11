@@ -6,6 +6,7 @@ using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Infrastructure.Authentication;
 using PulsePilot.Infrastructure.Persistence;
 using PulsePilot.Infrastructure.Persistence.Repositories;
+using PulsePilot.Infrastructure.Persistence.Seeding;
 
 namespace PulsePilot.Infrastructure;
 
@@ -45,10 +46,14 @@ public static class DependencyInjection
                 });
         });
 
+        services.Configure<DemoSeedOptions>(
+            configuration.GetSection(DemoSeedOptions.SectionName));
+
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
         services.AddScoped<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
+        services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddSingleton<IPasswordHasher, AspNetCorePasswordHasher>();
         services.AddSingleton<IAccessTokenGenerator, JwtAccessTokenGenerator>();

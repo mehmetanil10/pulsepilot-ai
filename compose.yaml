@@ -42,6 +42,10 @@ services:
     environment:
       <<: *api-environment
       Database__RunMigrations: "true"
+      Seed__Run: ${SEED_DEMO_DATA:-false}
+      Seed__Email: ${SEED_DEMO_EMAIL:-demo@pulsepilot.ai}
+      Seed__Password: ${SEED_DEMO_PASSWORD:-change-me}
+      Seed__FeedbackCount: ${SEED_FEEDBACK_COUNT:-100}
     depends_on:
       database:
         condition: service_healthy
@@ -59,6 +63,7 @@ services:
     environment:
       <<: *api-environment
       Database__RunMigrations: "false"
+      Seed__Run: "false"
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:

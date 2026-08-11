@@ -12,6 +12,7 @@ using PulsePilot.Api.Validation;
 using PulsePilot.Application;
 using PulsePilot.Infrastructure;
 using PulsePilot.Infrastructure.Persistence;
+using PulsePilot.Infrastructure.Persistence.Seeding;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -75,9 +76,18 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-if (app.Configuration.GetValue<bool>("Database:RunMigrations"))
+var runMigrations = app.Configuration.GetValue<bool>("Database:RunMigrations");
+var runDemoSeed = app.Configuration.GetValue<bool>($"{DemoSeedOptions.SectionName}:Run");
+
+if (runMigrations || runDemoSeed)
 {
     await app.ApplyDatabaseMigrationsAsync();
+
+    if (runDemoSeed)
+    {
+        await app.SeedDemoDataAsync();
+    }
+
     await app.DisposeAsync();
     return;
 }

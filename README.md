@@ -6,10 +6,11 @@ issues, and keep critical actions behind human approval.
 
 ## Current status
 
-Sprint 1 is in progress. The .NET 10 Clean Architecture foundation, core domain
+Sprint 1 is complete. The .NET 10 Clean Architecture foundation, core domain
 model, PostgreSQL persistence layer, JWT authentication, workspace-isolated
-Feedback CRUD, and API observability baseline are ready. EF Core migrations and
-Testcontainers-backed API and repository integration tests are included.
+Feedback CRUD, API observability baseline, Docker development stack, and
+idempotent demo seed are ready. EF Core migrations and Testcontainers-backed API,
+repository, and seed integration tests are included.
 
 ## Solution structure
 
@@ -38,8 +39,8 @@ PostgreSQL containers automatically.
 The Sprint 1 stack contains the API and PostgreSQL 17 with pgvector. A one-shot
 migration service must complete successfully before the API starts.
 
-Create the local environment file and replace both placeholder secrets. The JWT
-secret must contain at least 32 random bytes:
+Create the local environment file and replace the PostgreSQL and JWT placeholder
+secrets. The JWT secret must contain at least 32 random bytes:
 
 ```powershell
 Copy-Item .env.example .env
@@ -70,6 +71,30 @@ data volume.
 The API uses JWT bearer authentication and an ephemeral Data Protection provider;
 no cookie-encryption keys or application secrets are written into the image or
 container filesystem.
+
+## Demo seed data
+
+Demo data is disabled by default. To create a demo owner, workspace, and at least
+100 realistic feedback records, set these values in `.env` before starting the
+stack:
+
+```dotenv
+SEED_DEMO_DATA=true
+SEED_DEMO_EMAIL=demo@pulsepilot.ai
+SEED_DEMO_PASSWORD=replace-with-at-least-12-characters
+SEED_FEEDBACK_COUNT=100
+```
+
+The one-shot migration service applies migrations first and then seeds the demo
+workspace. Re-running it with the same database updates the demo account when
+needed and only adds feedback until the configured target is reached, so records
+are not duplicated. The feedback count must be between 100 and 10,000. The demo
+password is required only when seeding is enabled and must never be committed.
+
+After the API becomes healthy, sign in through `POST /api/auth/login` with the
+configured demo email and password. The generated feedback spans Payments,
+Authentication, Dashboard, Mobile, Reporting, Performance, and Feature Requests,
+with intentionally related reports for later semantic clustering work.
 
 ## API infrastructure
 
@@ -132,3 +157,12 @@ dotnet tool run dotnet-ef database update `
 
 The README will be expanded with architecture, Docker, API, AI evaluation, and
 deployment documentation as the project progresses.
+
+## Sprint 1 acceptance
+
+The automated test suite verifies registration, login, JWT authorization,
+workspace isolation, feedback create/list/detail/update/delete behavior,
+PostgreSQL persistence, validation and Problem Details responses, seed
+idempotency, and demo-account login. The Docker smoke flow verifies migration,
+optional seeding, API readiness, and authenticated feedback access against the
+Compose stack.

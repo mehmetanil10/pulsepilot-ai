@@ -33,12 +33,21 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
-    public ServiceProvider CreateServiceProvider()
+    public ServiceProvider CreateServiceProvider(
+        IReadOnlyDictionary<string, string?>? configurationOverrides = null)
     {
         var configurationValues = new Dictionary<string, string?>
         {
             ["ConnectionStrings:Database"] = ConnectionString,
         };
+
+        if (configurationOverrides is not null)
+        {
+            foreach (var (key, value) in configurationOverrides)
+            {
+                configurationValues[key] = value;
+            }
+        }
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configurationValues)
