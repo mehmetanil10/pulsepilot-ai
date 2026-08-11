@@ -34,7 +34,8 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     }
 
     public ServiceProvider CreateServiceProvider(
-        IReadOnlyDictionary<string, string?>? configurationOverrides = null)
+        IReadOnlyDictionary<string, string?>? configurationOverrides = null,
+        Action<IServiceCollection>? configureServices = null)
     {
         var configurationValues = new Dictionary<string, string?>
         {
@@ -56,6 +57,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddSingleton<IConfiguration>(configuration);
         services.AddInfrastructure(configuration);
+        configureServices?.Invoke(services);
 
         return services.BuildServiceProvider(validateScopes: true);
     }

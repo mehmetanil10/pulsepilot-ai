@@ -106,6 +106,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
         services.AddScoped<IFeedbackAnalysisRepository, FeedbackAnalysisRepository>();
+        services.AddScoped<IFeedbackProcessingQueue, FeedbackProcessingQueue>();
         services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddSingleton<IPasswordHasher, AspNetCorePasswordHasher>();

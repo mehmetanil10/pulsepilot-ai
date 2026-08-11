@@ -21,6 +21,10 @@ internal sealed class FeedbackConfiguration : IEntityTypeConfiguration<FeedbackE
                 tableBuilder.HasCheckConstraint(
                     "ck_feedback_processing_status",
                     "processing_status IN ('Pending', 'Processing', 'Completed', 'Failed')");
+                tableBuilder.HasCheckConstraint(
+                    "ck_feedback_processing_lease",
+                    "(processing_status = 'Processing' AND processing_lease_id IS NOT NULL AND processing_started_at IS NOT NULL) OR " +
+                    "(processing_status <> 'Processing' AND processing_lease_id IS NULL AND processing_started_at IS NULL)");
             });
 
         builder.HasKey(feedback => feedback.Id)
@@ -70,6 +74,13 @@ internal sealed class FeedbackConfiguration : IEntityTypeConfiguration<FeedbackE
             .HasMaxLength(32)
             .IsRequired();
 
+        builder.Property(feedback => feedback.ProcessingLeaseId)
+            .HasColumnName("processing_lease_id");
+
+        builder.Property(feedback => feedback.ProcessingStartedAt)
+            .HasColumnName("processing_started_at")
+            .HasColumnType("timestamp with time zone");
+
         builder.Property(feedback => feedback.CreatedAt)
             .HasColumnName("created_at")
             .HasColumnType("timestamp with time zone")
@@ -102,6 +113,13 @@ internal sealed class FeedbackConfiguration : IEntityTypeConfiguration<FeedbackE
 
         builder.HasIndex(feedback => new { feedback.WorkspaceId, feedback.ProcessingStatus })
             .HasDatabaseName("ix_feedback_workspace_id_processing_status");
+
+        builder.HasIndex(feedback => new
+        {
+            feedback.ProcessingStatus,
+            feedback.ProcessingStartedAt,
+        })
+            .HasDatabaseName("ix_feedback_processing_status_started_at");
 
         builder.HasIndex(feedback => feedback.CreatedByUserId)
             .HasDatabaseName("ix_feedback_created_by_user_id");

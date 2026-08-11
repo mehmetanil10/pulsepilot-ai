@@ -14,6 +14,14 @@ public interface IFeedbackService
         Guid feedbackId,
         CancellationToken cancellationToken = default);
 
+    Task<FeedbackAnalysisResponse> GetAnalysisAsync(
+        Guid feedbackId,
+        CancellationToken cancellationToken = default);
+
+    Task<FeedbackResponse> RetryAnalysisAsync(
+        Guid feedbackId,
+        CancellationToken cancellationToken = default);
+
     Task<FeedbackResponse> UpdateAsync(
         Guid feedbackId,
         UpdateFeedbackCommand command,

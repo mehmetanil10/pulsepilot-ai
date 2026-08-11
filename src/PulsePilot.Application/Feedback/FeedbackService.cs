@@ -8,6 +8,7 @@ namespace PulsePilot.Application.Feedback;
 
 internal sealed class FeedbackService(
     IFeedbackRepository feedbackRepository,
+    IFeedbackAnalysisRepository feedbackAnalysisRepository,
     IUnitOfWork unitOfWork,
     ICurrentUserContext currentUser,
     TimeProvider timeProvider) : IFeedbackService
@@ -67,6 +68,37 @@ internal sealed class FeedbackService(
         CancellationToken cancellationToken = default)
     {
         var feedback = await GetRequiredFeedbackAsync(feedbackId, cancellationToken);
+
+        return FeedbackResponse.FromEntity(feedback);
+    }
+
+    public async Task<FeedbackAnalysisResponse> GetAnalysisAsync(
+        Guid feedbackId,
+        CancellationToken cancellationToken = default)
+    {
+        var feedback = await GetRequiredFeedbackAsync(feedbackId, cancellationToken);
+        var analysis = await feedbackAnalysisRepository.GetByFeedbackIdAsync(
+            currentUser.WorkspaceId,
+            feedbackId,
+            cancellationToken);
+
+        return FeedbackAnalysisResponse.FromEntities(feedback, analysis);
+    }
+
+    public async Task<FeedbackResponse> RetryAnalysisAsync(
+        Guid feedbackId,
+        CancellationToken cancellationToken = default)
+    {
+        var feedback = await GetRequiredFeedbackAsync(feedbackId, cancellationToken);
+
+        if (feedback.ProcessingStatus != PulsePilot.Domain.Feedback.ProcessingStatus.Failed)
+        {
+            throw new ConflictException(
+                "Only failed feedback analysis can be queued for retry.");
+        }
+
+        feedback.RetryProcessing(timeProvider.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return FeedbackResponse.FromEntity(feedback);
     }

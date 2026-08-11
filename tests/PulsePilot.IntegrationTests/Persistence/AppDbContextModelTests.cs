@@ -76,6 +76,10 @@ public sealed class AppDbContextModelTests
         var feedbackEntity = dbContext.Model.FindEntityType(typeof(FeedbackEntity));
         var source = feedbackEntity?.FindProperty(nameof(FeedbackEntity.Source));
         var processingStatus = feedbackEntity?.FindProperty(nameof(FeedbackEntity.ProcessingStatus));
+        var processingLeaseId = feedbackEntity?.FindProperty(
+            nameof(FeedbackEntity.ProcessingLeaseId));
+        var processingStartedAt = feedbackEntity?.FindProperty(
+            nameof(FeedbackEntity.ProcessingStartedAt));
         var indexNames = feedbackEntity!
             .GetIndexes()
             .Select(index => index.GetDatabaseName())
@@ -83,8 +87,11 @@ public sealed class AppDbContextModelTests
 
         Assert.Equal(typeof(string), source!.GetTypeMapping().Converter?.ProviderClrType);
         Assert.Equal(typeof(string), processingStatus!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal("processing_lease_id", processingLeaseId!.GetColumnName());
+        Assert.Equal("processing_started_at", processingStartedAt!.GetColumnName());
         Assert.Contains("ix_feedback_workspace_id_created_at", indexNames);
         Assert.Contains("ix_feedback_workspace_id_processing_status", indexNames);
+        Assert.Contains("ix_feedback_processing_status_started_at", indexNames);
     }
 
     [Fact]

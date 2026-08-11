@@ -43,13 +43,41 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
         Assert.Equal(FeedbackSource.Manual, created.Source);
         Assert.NotNull(createResponse.Headers.Location);
 
+        var pendingAnalysis = await ownerClient.GetFromJsonAsync<FeedbackAnalysisResponse>(
+            $"/api/feedback/{created.Id}/analysis",
+            SerializerOptions);
+        using var retryPendingResponse = await ownerClient.PostAsync(
+            $"/api/feedback/{created.Id}/analysis/retry",
+            content: null);
+
+        Assert.NotNull(pendingAnalysis);
+        Assert.Equal(ProcessingStatus.Pending, pendingAnalysis.ProcessingStatus);
+        Assert.False(pendingAnalysis.IsCurrent);
+        Assert.Null(pendingAnalysis.Analysis);
+        Assert.Equal(HttpStatusCode.Conflict, retryPendingResponse.StatusCode);
+
         using var outsiderGetResponse = await outsiderClient.GetAsync(
             $"/api/feedback/{created.Id}");
+        using var outsiderAnalysisResponse = await outsiderClient.GetAsync(
+            $"/api/feedback/{created.Id}/analysis");
         using var outsiderDeleteResponse = await outsiderClient.DeleteAsync(
             $"/api/feedback/{created.Id}");
 
         Assert.Equal(HttpStatusCode.NotFound, outsiderGetResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, outsiderAnalysisResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, outsiderDeleteResponse.StatusCode);
+
+        await CompleteAnalysisAsync(factory, created.Id);
+        var completedAnalysis = await ownerClient.GetFromJsonAsync<FeedbackAnalysisResponse>(
+            $"/api/feedback/{created.Id}/analysis",
+            SerializerOptions);
+
+        Assert.NotNull(completedAnalysis);
+        Assert.Equal(ProcessingStatus.Completed, completedAnalysis.ProcessingStatus);
+        Assert.True(completedAnalysis.IsCurrent);
+        Assert.NotNull(completedAnalysis.Analysis);
+        Assert.Equal(FeedbackCategory.Bug, completedAnalysis.Analysis.Category);
+        Assert.Equal(FeedbackComponent.Payments, completedAnalysis.Analysis.Component);
 
         var updateCommand = new UpdateFeedbackCommand(
             "Payment card problem",
@@ -68,6 +96,25 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
         Assert.Equal("Payment card problem", updated.Title);
         Assert.Equal(FeedbackSource.Api, updated.Source);
         Assert.Equal(ProcessingStatus.Pending, updated.ProcessingStatus);
+
+        var staleAnalysis = await ownerClient.GetFromJsonAsync<FeedbackAnalysisResponse>(
+            $"/api/feedback/{created.Id}/analysis",
+            SerializerOptions);
+
+        Assert.NotNull(staleAnalysis);
+        Assert.Equal(ProcessingStatus.Pending, staleAnalysis.ProcessingStatus);
+        Assert.False(staleAnalysis.IsCurrent);
+        Assert.NotNull(staleAnalysis.Analysis);
+
+        await MarkAnalysisFailedAsync(factory, created.Id);
+        using var retryFailedResponse = await ownerClient.PostAsync(
+            $"/api/feedback/{created.Id}/analysis/retry",
+            content: null);
+        var retried = await ReadAsync<FeedbackResponse>(retryFailedResponse);
+
+        Assert.Equal(HttpStatusCode.OK, retryFailedResponse.StatusCode);
+        Assert.NotNull(retried);
+        Assert.Equal(ProcessingStatus.Pending, retried.ProcessingStatus);
 
         using var getResponse = await ownerClient.GetAsync($"/api/feedback/{created.Id}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
@@ -199,6 +246,45 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
             new CreateFeedbackCommand(title, $"{title} content", source, null, null));
 
         response.EnsureSuccessStatusCode();
+    }
+
+    private static async Task CompleteAnalysisAsync(
+        PulsePilotApiFactory factory,
+        Guid feedbackId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var feedback = await dbContext.Feedback.SingleAsync(entity => entity.Id == feedbackId);
+        var processingLeaseId = feedback.StartProcessing(DateTimeOffset.UtcNow);
+        var analyzedAt = DateTimeOffset.UtcNow;
+        var analysis = FeedbackAnalysis.Create(
+            feedback.WorkspaceId,
+            feedback.Id,
+            FeedbackCategory.Bug,
+            FeedbackComponent.Payments,
+            4,
+            FeedbackSentiment.Negative,
+            "User cannot add a payment card.",
+            "Inspect payment tokenization failures.",
+            0.94m,
+            analyzedAt);
+
+        dbContext.FeedbackAnalyses.Add(analysis);
+        feedback.CompleteProcessing(processingLeaseId, analyzedAt);
+        await dbContext.SaveChangesAsync();
+    }
+
+    private static async Task MarkAnalysisFailedAsync(
+        PulsePilotApiFactory factory,
+        Guid feedbackId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var feedback = await dbContext.Feedback.SingleAsync(entity => entity.Id == feedbackId);
+        var processingLeaseId = feedback.StartProcessing(DateTimeOffset.UtcNow);
+
+        feedback.FailProcessing(processingLeaseId, DateTimeOffset.UtcNow);
+        await dbContext.SaveChangesAsync();
     }
 
     private static Task<HttpResponseMessage> PostAsJsonAsync<T>(

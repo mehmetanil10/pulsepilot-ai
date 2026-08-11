@@ -51,6 +51,10 @@ public sealed class Feedback : AuditableEntity
 
     public ProcessingStatus ProcessingStatus { get; private set; }
 
+    public Guid? ProcessingLeaseId { get; private set; }
+
+    public DateTimeOffset? ProcessingStartedAt { get; private set; }
+
     public DateTimeOffset? DeletedAt { get; private set; }
 
     public bool IsDeleted => DeletedAt.HasValue;
@@ -111,30 +115,56 @@ public sealed class Feedback : AuditableEntity
         CustomerName = validatedCustomerName;
         CustomerEmail = validatedCustomerEmail;
         ProcessingStatus = ProcessingStatus.Pending;
+        ClearProcessingLease();
     }
 
-    public void StartProcessing(DateTimeOffset updatedAt)
+    public Guid StartProcessing(DateTimeOffset updatedAt)
     {
         EnsureNotDeleted();
         ChangeProcessingStatus(ProcessingStatus.Pending, ProcessingStatus.Processing, updatedAt);
+
+        ProcessingLeaseId = Guid.CreateVersion7();
+        ProcessingStartedAt = UpdatedAt;
+
+        return ProcessingLeaseId.Value;
     }
 
     public void CompleteProcessing(DateTimeOffset updatedAt)
     {
-        EnsureNotDeleted();
+        CompleteProcessing(GetRequiredProcessingLease(), updatedAt);
+    }
+
+    public void CompleteProcessing(Guid processingLeaseId, DateTimeOffset updatedAt)
+    {
+        EnsureActiveProcessingLease(processingLeaseId);
         ChangeProcessingStatus(ProcessingStatus.Processing, ProcessingStatus.Completed, updatedAt);
+        ClearProcessingLease();
     }
 
     public void FailProcessing(DateTimeOffset updatedAt)
     {
-        EnsureNotDeleted();
+        FailProcessing(GetRequiredProcessingLease(), updatedAt);
+    }
+
+    public void FailProcessing(Guid processingLeaseId, DateTimeOffset updatedAt)
+    {
+        EnsureActiveProcessingLease(processingLeaseId);
         ChangeProcessingStatus(ProcessingStatus.Processing, ProcessingStatus.Failed, updatedAt);
+        ClearProcessingLease();
     }
 
     public void RetryProcessing(DateTimeOffset updatedAt)
     {
         EnsureNotDeleted();
         ChangeProcessingStatus(ProcessingStatus.Failed, ProcessingStatus.Pending, updatedAt);
+        ClearProcessingLease();
+    }
+
+    public bool HasActiveProcessingLease(Guid processingLeaseId)
+    {
+        return ProcessingStatus == ProcessingStatus.Processing
+            && processingLeaseId != Guid.Empty
+            && ProcessingLeaseId == processingLeaseId;
     }
 
     public void MarkDeleted(DateTimeOffset deletedAt)
@@ -170,5 +200,27 @@ public sealed class Feedback : AuditableEntity
         {
             throw new DomainException("Deleted feedback cannot be changed.");
         }
+    }
+
+    private Guid GetRequiredProcessingLease()
+    {
+        return ProcessingLeaseId
+            ?? throw new DomainException("Feedback does not have an active processing lease.");
+    }
+
+    private void EnsureActiveProcessingLease(Guid processingLeaseId)
+    {
+        EnsureNotDeleted();
+
+        if (!HasActiveProcessingLease(processingLeaseId))
+        {
+            throw new DomainException("Feedback processing lease is no longer active.");
+        }
+    }
+
+    private void ClearProcessingLease()
+    {
+        ProcessingLeaseId = null;
+        ProcessingStartedAt = null;
     }
 }

@@ -109,11 +109,16 @@ public sealed class FeedbackTests
     {
         var feedback = CreateFeedback();
 
-        feedback.StartProcessing(CreatedAt.AddMinutes(1));
+        var processingLeaseId = feedback.StartProcessing(CreatedAt.AddMinutes(1));
         Assert.Equal(ProcessingStatus.Processing, feedback.ProcessingStatus);
+        Assert.Equal(processingLeaseId, feedback.ProcessingLeaseId);
+        Assert.Equal(CreatedAt.AddMinutes(1).ToUniversalTime(), feedback.ProcessingStartedAt);
+        Assert.True(feedback.HasActiveProcessingLease(processingLeaseId));
 
         feedback.CompleteProcessing(CreatedAt.AddMinutes(2));
         Assert.Equal(ProcessingStatus.Completed, feedback.ProcessingStatus);
+        Assert.Null(feedback.ProcessingLeaseId);
+        Assert.Null(feedback.ProcessingStartedAt);
         Assert.Equal(CreatedAt.AddMinutes(2).ToUniversalTime(), feedback.UpdatedAt);
     }
 
@@ -138,6 +143,24 @@ public sealed class FeedbackTests
         feedback.RetryProcessing(CreatedAt.AddMinutes(3));
 
         Assert.Equal(ProcessingStatus.Pending, feedback.ProcessingStatus);
+        Assert.Null(feedback.ProcessingLeaseId);
+        Assert.Null(feedback.ProcessingStartedAt);
+    }
+
+    [Fact]
+    public void Completion_WithExpiredLease_ThrowsDomainException()
+    {
+        var feedback = CreateFeedback();
+        var expiredLeaseId = feedback.StartProcessing(CreatedAt.AddMinutes(1));
+        feedback.FailProcessing(expiredLeaseId, CreatedAt.AddMinutes(2));
+        feedback.RetryProcessing(CreatedAt.AddMinutes(3));
+        var activeLeaseId = feedback.StartProcessing(CreatedAt.AddMinutes(4));
+
+        Assert.Throws<DomainException>(() =>
+            feedback.CompleteProcessing(expiredLeaseId, CreatedAt.AddMinutes(5)));
+
+        Assert.Equal(ProcessingStatus.Processing, feedback.ProcessingStatus);
+        Assert.True(feedback.HasActiveProcessingLease(activeLeaseId));
     }
 
     [Fact]

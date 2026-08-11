@@ -12,8 +12,11 @@ workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, and idempotent demo seed are ready. The AI intelligence foundation now
 includes provider-independent structured analysis contracts, a persisted
 `FeedbackAnalysis` model, and an OpenAI Responses API adapter with strict
-Structured Outputs. EF Core migrations and Testcontainers-backed API,
-repository, seed, and provider-contract integration tests are included.
+Structured Outputs. A separate database-backed worker now claims pending
+feedback with expiring leases, retries transient failures, and persists analysis
+without holding a transaction during the AI call. EF Core migrations and
+Testcontainers-backed API, repository, seed, worker, and provider-contract
+integration tests are included.
 
 ## Solution structure
 
@@ -21,6 +24,7 @@ repository, seed, and provider-contract integration tests are included.
 - `PulsePilot.Application`: use cases and application abstractions
 - `PulsePilot.Infrastructure`: persistence and external service adapters
 - `PulsePilot.Api`: ASP.NET Core HTTP API
+- `PulsePilot.Worker`: durable background feedback analysis host
 - `PulsePilot.UnitTests`: domain and application tests
 - `PulsePilot.IntegrationTests`: API and infrastructure tests
 
@@ -39,8 +43,9 @@ PostgreSQL containers automatically.
 
 ## Docker setup
 
-The Sprint 1 stack contains the API and PostgreSQL 17 with pgvector. A one-shot
-migration service must complete successfully before the API starts.
+The stack contains the API, background worker, and PostgreSQL 17 with pgvector.
+A one-shot migration service must complete successfully before the API and
+worker start.
 
 Create the local environment file and replace the PostgreSQL and JWT placeholder
 secrets. The JWT secret must contain at least 32 random bytes:
@@ -64,7 +69,7 @@ Swagger UI is available at `http://localhost:8080/swagger` when the environment
 is `Development`. View logs or stop the stack with:
 
 ```powershell
-docker compose logs --follow api
+docker compose logs --follow api worker
 docker compose down
 ```
 
@@ -165,12 +170,25 @@ OpenAI access is disabled by default. To enable it locally, set these values in
 OPENAI_ENABLED=true
 OPENAI_API_KEY=replace-with-a-project-api-key
 OPENAI_MODEL=gpt-5.6-luna
+FEEDBACK_PROCESSING_ENABLED=true
 ```
 
-The API validates configuration at startup when the provider is enabled. The
-adapter does not persist provider responses, and provider-side retries and
-background analysis orchestration are intentionally reserved for the next
-Sprint 2 task.
+The worker validates processing and provider configuration at startup. Each
+pending feedback row is claimed atomically with a unique processing lease so
+multiple worker replicas cannot process the same active job. AI calls run
+outside database transactions. Transient failures use bounded exponential
+backoff with jitter; permanent failures move the feedback to `Failed`. Stale
+leases are recovered after the configured threshold, while late results from an
+expired lease are discarded.
+
+Analysis state and the latest persisted result are available through:
+
+- `GET /api/feedback/{id}/analysis`
+- `POST /api/feedback/{id}/analysis/retry`
+
+The retry endpoint only accepts failed processing records. Updating feedback
+returns it to `Pending`; an older analysis remains visible with
+`isCurrent: false` until the worker replaces it.
 
 ## Database migrations
 

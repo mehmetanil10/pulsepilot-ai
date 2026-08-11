@@ -5,6 +5,11 @@ x-api-build: &api-build
   dockerfile: Dockerfile
   target: final
 
+x-worker-build: &worker-build
+  context: .
+  dockerfile: Dockerfile
+  target: worker-final
+
 x-api-environment: &api-environment
   ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
   ASPNETCORE_HTTP_PORTS: "8080"
@@ -83,6 +88,33 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
     stop_grace_period: 15s
+
+  worker:
+    image: pulsepilot-worker:${IMAGE_TAG:-local}
+    build: *worker-build
+    environment:
+      <<: *api-environment
+      FeedbackProcessing__Enabled: ${FEEDBACK_PROCESSING_ENABLED:-false}
+      FeedbackProcessing__PollIntervalMilliseconds: ${FEEDBACK_PROCESSING_POLL_INTERVAL_MS:-1000}
+      FeedbackProcessing__RecoveryIntervalSeconds: ${FEEDBACK_PROCESSING_RECOVERY_INTERVAL_SECONDS:-60}
+      FeedbackProcessing__StaleProcessingThresholdMinutes: ${FEEDBACK_PROCESSING_STALE_THRESHOLD_MINUTES:-5}
+      FeedbackProcessing__MaxAttempts: ${FEEDBACK_PROCESSING_MAX_ATTEMPTS:-3}
+      FeedbackProcessing__AnalysisTimeoutSeconds: ${FEEDBACK_PROCESSING_TIMEOUT_SECONDS:-45}
+      FeedbackProcessing__BaseRetryDelayMilliseconds: ${FEEDBACK_PROCESSING_BASE_RETRY_DELAY_MS:-500}
+      FeedbackProcessing__MaxRetryDelaySeconds: ${FEEDBACK_PROCESSING_MAX_RETRY_DELAY_SECONDS:-5}
+      FeedbackProcessing__RetryJitterFactor: ${FEEDBACK_PROCESSING_RETRY_JITTER_FACTOR:-0.2}
+      FeedbackProcessing__MaxRecoveredPerSweep: ${FEEDBACK_PROCESSING_MAX_RECOVERED_PER_SWEEP:-100}
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 30s
 
 volumes:
   postgres-data:

@@ -41,6 +41,27 @@ public sealed class FeedbackController(IFeedbackService feedbackService) : Contr
         return Ok(await feedbackService.GetByIdAsync(id, cancellationToken));
     }
 
+    [HttpGet("{id:guid}/analysis")]
+    [ProducesResponseType<FeedbackAnalysisResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<FeedbackAnalysisResponse>> GetAnalysis(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await feedbackService.GetAnalysisAsync(id, cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/analysis/retry")]
+    [ProducesResponseType<FeedbackResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<FeedbackResponse>> RetryAnalysis(
+        Guid id,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await feedbackService.RetryAnalysisAsync(id, cancellationToken));
+    }
+
     [HttpPut("{id:guid}")]
     [ProducesResponseType<FeedbackResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
