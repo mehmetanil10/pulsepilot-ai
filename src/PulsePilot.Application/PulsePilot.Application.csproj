@@ -1,0 +1,7 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\PulsePilot.Domain\PulsePilot.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
