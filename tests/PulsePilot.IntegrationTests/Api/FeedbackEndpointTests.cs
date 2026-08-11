@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using PulsePilot.Application.AI;
 using PulsePilot.Application.Authentication;
 using PulsePilot.Application.Feedback;
 using PulsePilot.Domain.Feedback;
@@ -49,22 +50,28 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
         using var retryPendingResponse = await ownerClient.PostAsync(
             $"/api/feedback/{created.Id}/analysis/retry",
             content: null);
+        using var pendingSimilarResponse = await ownerClient.GetAsync(
+            $"/api/feedback/{created.Id}/similar");
 
         Assert.NotNull(pendingAnalysis);
         Assert.Equal(ProcessingStatus.Pending, pendingAnalysis.ProcessingStatus);
         Assert.False(pendingAnalysis.IsCurrent);
         Assert.Null(pendingAnalysis.Analysis);
         Assert.Equal(HttpStatusCode.Conflict, retryPendingResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, pendingSimilarResponse.StatusCode);
 
         using var outsiderGetResponse = await outsiderClient.GetAsync(
             $"/api/feedback/{created.Id}");
         using var outsiderAnalysisResponse = await outsiderClient.GetAsync(
             $"/api/feedback/{created.Id}/analysis");
+        using var outsiderSimilarResponse = await outsiderClient.GetAsync(
+            $"/api/feedback/{created.Id}/similar");
         using var outsiderDeleteResponse = await outsiderClient.DeleteAsync(
             $"/api/feedback/{created.Id}");
 
         Assert.Equal(HttpStatusCode.NotFound, outsiderGetResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, outsiderAnalysisResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, outsiderSimilarResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, outsiderDeleteResponse.StatusCode);
 
         await CompleteAnalysisAsync(factory, created.Id);
@@ -214,6 +221,55 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
         Assert.True(errors.TryGetProperty("CustomerEmail", out _));
     }
 
+    [Fact]
+    public async Task Similar_ReturnsThresholdedCosineMatchesWithinCurrentWorkspace()
+    {
+        await using var factory = new PulsePilotApiFactory(database.ConnectionString);
+        using var ownerClient = await CreateAuthenticatedClientAsync(factory, "similar-owner");
+        using var outsiderClient = await CreateAuthenticatedClientAsync(factory, "similar-outsider");
+        var source = await CreateFeedbackAsync(
+            ownerClient,
+            "Payment page freezes",
+            FeedbackSource.Manual);
+        var closeMatch = await CreateFeedbackAsync(
+            ownerClient,
+            "Checkout cannot complete",
+            FeedbackSource.Api);
+        var unrelated = await CreateFeedbackAsync(
+            ownerClient,
+            "Dark mode request",
+            FeedbackSource.Manual);
+        var pending = await CreateFeedbackAsync(
+            ownerClient,
+            "Pending feedback",
+            FeedbackSource.Manual);
+
+        await CompleteAnalysisAsync(factory, source.Id, CreateVector(1, 0));
+        await CompleteAnalysisAsync(factory, closeMatch.Id, CreateVector(0.99f, 0.1f));
+        await CompleteAnalysisAsync(factory, unrelated.Id, CreateVector(0, 1));
+
+        var response = await ownerClient.GetFromJsonAsync<SimilarFeedbackResponse>(
+            $"/api/feedback/{source.Id}/similar?limit=10",
+            SerializerOptions);
+        using var invalidLimitResponse = await ownerClient.GetAsync(
+            $"/api/feedback/{source.Id}/similar?limit=0");
+        using var pendingResponse = await ownerClient.GetAsync(
+            $"/api/feedback/{pending.Id}/similar");
+        using var outsiderResponse = await outsiderClient.GetAsync(
+            $"/api/feedback/{source.Id}/similar");
+
+        Assert.NotNull(response);
+        Assert.Equal(source.Id, response.FeedbackId);
+        Assert.Equal(SemanticSearchOptions.DefaultSimilarityThreshold, response.SimilarityThreshold);
+        Assert.Equal(1, response.Count);
+        var match = Assert.Single(response.Items);
+        Assert.Equal(closeMatch.Id, match.Id);
+        Assert.True(match.Similarity > 0.99);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidLimitResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, pendingResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, outsiderResponse.StatusCode);
+    }
+
     private static async Task<HttpClient> CreateAuthenticatedClientAsync(
         PulsePilotApiFactory factory,
         string label)
@@ -235,7 +291,7 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
         return client;
     }
 
-    private static async Task CreateFeedbackAsync(
+    private static async Task<FeedbackResponse> CreateFeedbackAsync(
         HttpClient client,
         string title,
         FeedbackSource source)
@@ -246,11 +302,14 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
             new CreateFeedbackCommand(title, $"{title} content", source, null, null));
 
         response.EnsureSuccessStatusCode();
+
+        return (await ReadAsync<FeedbackResponse>(response))!;
     }
 
     private static async Task CompleteAnalysisAsync(
         PulsePilotApiFactory factory,
-        Guid feedbackId)
+        Guid feedbackId,
+        float[]? embeddingValues = null)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -268,10 +327,30 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
             "Inspect payment tokenization failures.",
             0.94m,
             analyzedAt);
+        var embeddingInput = FeedbackEmbeddingSource.CreateText(
+            feedback.Title,
+            feedback.Content);
+        var embedding = FeedbackEmbedding.Create(
+            feedback.WorkspaceId,
+            feedback.Id,
+            embeddingValues ?? CreateVector(1, 0),
+            "integration-test-embedding-model",
+            FeedbackEmbeddingSource.ComputeHash(embeddingInput),
+            analyzedAt);
 
         dbContext.FeedbackAnalyses.Add(analysis);
+        dbContext.FeedbackEmbeddings.Add(embedding);
         feedback.CompleteProcessing(processingLeaseId, analyzedAt);
         await dbContext.SaveChangesAsync();
+    }
+
+    private static float[] CreateVector(float first, float second)
+    {
+        var values = new float[FeedbackEmbedding.Dimensions];
+        values[0] = first;
+        values[1] = second;
+
+        return values;
     }
 
     private static async Task MarkAnalysisFailedAsync(

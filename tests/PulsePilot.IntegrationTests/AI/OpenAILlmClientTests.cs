@@ -9,6 +9,8 @@ using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using OpenAI;
+using OpenAI.Embeddings;
 using OpenAI.Responses;
 using PulsePilot.Application;
 using PulsePilot.Application.AI;
@@ -208,6 +210,75 @@ public sealed class OpenAILlmClientTests
     }
 
     [Fact]
+    public async Task GenerateEmbeddingAsync_SendsDimensionsAndReturnsValidatedVector()
+    {
+        string? requestBody = null;
+        var expectedValues = CreateEmbeddingValues();
+        var client = CreateClient(async (request, cancellationToken) =>
+        {
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateJsonResponse(CreateEmbeddingResponseJson(expectedValues));
+        });
+        var request = new FeedbackEmbeddingRequest(
+            Guid.CreateVersion7(),
+            "Title: Card cannot be added\nContent: Checkout fails.");
+
+        var result = await client.GenerateEmbeddingAsync(request);
+
+        Assert.Equal(OpenAIOptions.DefaultEmbeddingModel, result.Model);
+        Assert.Equal(FeedbackEmbedding.Dimensions, result.Values.Count);
+        Assert.Equal(expectedValues[0], result.Values[0]);
+        Assert.NotNull(requestBody);
+
+        using var requestDocument = JsonDocument.Parse(requestBody);
+        var root = requestDocument.RootElement;
+        Assert.Equal(FeedbackEmbedding.Dimensions, root.GetProperty("dimensions").GetInt32());
+        Assert.Equal(request.Input, root.GetProperty("input").GetString());
+        Assert.DoesNotContain("integration-test-api-key", requestBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GenerateEmbeddingAsync_RejectsUnexpectedVectorDimensions()
+    {
+        var client = CreateClient((_, _) => Task.FromResult(CreateJsonResponse(
+            CreateEmbeddingResponseJson([0.1f, 0.2f]))));
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            client.GenerateEmbeddingAsync(new FeedbackEmbeddingRequest(
+                Guid.CreateVersion7(),
+                "A valid embedding input.")));
+
+        Assert.Equal(LlmProviderFailureKind.InvalidResponse, exception.FailureKind);
+        Assert.False(exception.IsTransient);
+    }
+
+    [Fact]
+    public async Task GenerateEmbeddingAsync_ClassifiesRateLimitAsTransient()
+    {
+        var client = CreateClient((_, _) => Task.FromResult(CreateJsonResponse(
+            """
+            {
+              "error": {
+                "message": "Rate limit reached.",
+                "type": "rate_limit_error",
+                "param": null,
+                "code": "rate_limit_exceeded"
+              }
+            }
+            """,
+            HttpStatusCode.TooManyRequests)));
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            client.GenerateEmbeddingAsync(new FeedbackEmbeddingRequest(
+                Guid.CreateVersion7(),
+                "A valid embedding input.")));
+
+        Assert.Equal(LlmProviderFailureKind.ProviderUnavailable, exception.FailureKind);
+        Assert.True(exception.IsTransient);
+        Assert.DoesNotContain("Rate limit reached", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void OpenAIOptions_RequireApiKeyWhenProviderIsEnabled()
     {
         var configuration = new ConfigurationBuilder()
@@ -245,6 +316,21 @@ public sealed class OpenAILlmClientTests
                     EnableMessageContentLogging = false,
                 },
             });
+        var embeddingClient = new EmbeddingClient(
+            OpenAIOptions.DefaultEmbeddingModel,
+            new ApiKeyCredential("integration-test-api-key"),
+            new OpenAIClientOptions
+            {
+                Endpoint = new Uri("https://openai.test/v1/"),
+                Transport = new HttpClientPipelineTransport(httpClient),
+                RetryPolicy = new ClientRetryPolicy(maxRetries: 0),
+                ClientLoggingOptions = new ClientLoggingOptions
+                {
+                    EnableLogging = false,
+                    EnableMessageLogging = false,
+                    EnableMessageContentLogging = false,
+                },
+            });
         var options = Options.Create(new OpenAIOptions
         {
             Enabled = enabled,
@@ -253,6 +339,7 @@ public sealed class OpenAILlmClientTests
 
         return new OpenAILlmClient(
             responsesClient,
+            embeddingClient,
             options,
             new FeedbackAnalysisResultValidator());
     }
@@ -359,6 +446,37 @@ public sealed class OpenAILlmClientTests
             },
             metadata = new { },
         });
+    }
+
+    private static string CreateEmbeddingResponseJson(float[] values)
+    {
+        return JsonSerializer.Serialize(new
+        {
+            @object = "list",
+            data = new[]
+            {
+                new
+                {
+                    @object = "embedding",
+                    embedding = values,
+                    index = 0,
+                },
+            },
+            model = OpenAIOptions.DefaultEmbeddingModel,
+            usage = new
+            {
+                prompt_tokens = 10,
+                total_tokens = 10,
+            },
+        });
+    }
+
+    private static float[] CreateEmbeddingValues()
+    {
+        var values = new float[FeedbackEmbedding.Dimensions];
+        values[0] = 0.5f;
+
+        return values;
     }
 
     private sealed class StubHttpMessageHandler(

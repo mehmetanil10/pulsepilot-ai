@@ -25,9 +25,12 @@ public sealed class AppDbContext : DbContext, IUnitOfWork
 
     public DbSet<FeedbackAnalysis> FeedbackAnalyses => Set<FeedbackAnalysis>();
 
+    public DbSet<FeedbackEmbedding> FeedbackEmbeddings => Set<FeedbackEmbedding>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+        modelBuilder.HasPostgresExtension("vector");
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
     }
 }

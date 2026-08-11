@@ -16,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IFeedbackAnalysisProcessor, FeedbackAnalysisProcessor>();
         services.AddOptions<FeedbackProcessingOptions>();
+        services.AddOptions<SemanticSearchOptions>();
         services.TryAddSingleton(TimeProvider.System);
 
         return services;

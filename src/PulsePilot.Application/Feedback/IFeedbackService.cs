@@ -18,6 +18,11 @@ public interface IFeedbackService
         Guid feedbackId,
         CancellationToken cancellationToken = default);
 
+    Task<SimilarFeedbackResponse> GetSimilarAsync(
+        Guid feedbackId,
+        SimilarFeedbackQuery query,
+        CancellationToken cancellationToken = default);
+
     Task<FeedbackResponse> RetryAnalysisAsync(
         Guid feedbackId,
         CancellationToken cancellationToken = default);

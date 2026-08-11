@@ -1,6 +1,9 @@
+using Microsoft.Extensions.Options;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
+using PulsePilot.Domain.Feedback;
 
 using FeedbackEntity = PulsePilot.Domain.Feedback.Feedback;
 
@@ -9,10 +12,14 @@ namespace PulsePilot.Application.Feedback;
 internal sealed class FeedbackService(
     IFeedbackRepository feedbackRepository,
     IFeedbackAnalysisRepository feedbackAnalysisRepository,
+    IFeedbackEmbeddingRepository feedbackEmbeddingRepository,
     IUnitOfWork unitOfWork,
     ICurrentUserContext currentUser,
-    TimeProvider timeProvider) : IFeedbackService
+    TimeProvider timeProvider,
+    IOptions<SemanticSearchOptions> semanticSearchOptions) : IFeedbackService
 {
+    private readonly SemanticSearchOptions _semanticSearchOptions = semanticSearchOptions.Value;
+
     public async Task<FeedbackResponse> CreateAsync(
         CreateFeedbackCommand command,
         CancellationToken cancellationToken = default)
@@ -83,6 +90,62 @@ internal sealed class FeedbackService(
             cancellationToken);
 
         return FeedbackAnalysisResponse.FromEntities(feedback, analysis);
+    }
+
+    public async Task<SimilarFeedbackResponse> GetSimilarAsync(
+        Guid feedbackId,
+        SimilarFeedbackQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var feedback = await GetRequiredFeedbackAsync(feedbackId, cancellationToken);
+        var embedding = await feedbackEmbeddingRepository.GetByFeedbackIdAsync(
+            currentUser.WorkspaceId,
+            feedbackId,
+            cancellationToken);
+        var currentSource = FeedbackEmbeddingSource.CreateText(
+            feedback.Title,
+            feedback.Content);
+        var currentSourceHash = FeedbackEmbeddingSource.ComputeHash(currentSource);
+
+        if (feedback.ProcessingStatus != ProcessingStatus.Completed
+            || embedding is null
+            || !string.Equals(
+                embedding.SourceHash,
+                currentSourceHash,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ConflictException(
+                "Similar feedback is available after the current feedback embedding is completed.");
+        }
+
+        var limit = query.Limit ?? _semanticSearchOptions.DefaultLimit;
+
+        if (limit is < 1 || limit > _semanticSearchOptions.MaxLimit)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(query),
+                $"Similar feedback limit must be between 1 and {_semanticSearchOptions.MaxLimit}.");
+        }
+
+        var matches = await feedbackEmbeddingRepository.FindSimilarAsync(
+            currentUser.WorkspaceId,
+            feedbackId,
+            _semanticSearchOptions.SimilarityThreshold,
+            limit,
+            cancellationToken);
+
+        return new SimilarFeedbackResponse(
+            feedbackId,
+            _semanticSearchOptions.SimilarityThreshold,
+            matches.Select(match => new SimilarFeedbackItemResponse(
+                match.FeedbackId,
+                match.Title,
+                match.Content,
+                match.Source,
+                match.Similarity,
+                match.CreatedAt)).ToList());
     }
 
     public async Task<FeedbackResponse> RetryAnalysisAsync(

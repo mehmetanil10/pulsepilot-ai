@@ -51,6 +51,19 @@ public sealed class FeedbackController(IFeedbackService feedbackService) : Contr
         return Ok(await feedbackService.GetAnalysisAsync(id, cancellationToken));
     }
 
+    [HttpGet("{id:guid}/similar")]
+    [ProducesResponseType<SimilarFeedbackResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<SimilarFeedbackResponse>> GetSimilar(
+        Guid id,
+        [FromQuery] SimilarFeedbackQuery query,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await feedbackService.GetSimilarAsync(id, query, cancellationToken));
+    }
+
     [HttpPost("{id:guid}/analysis/retry")]
     [ProducesResponseType<FeedbackResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

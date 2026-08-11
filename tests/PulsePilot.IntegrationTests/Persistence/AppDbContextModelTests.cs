@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Pgvector.EntityFrameworkCore;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
@@ -24,6 +25,9 @@ public sealed class AppDbContextModelTests
         Assert.Equal(
             "feedback_analyses",
             dbContext.Model.FindEntityType(typeof(FeedbackAnalysis))?.GetTableName());
+        Assert.Equal(
+            "feedback_embeddings",
+            dbContext.Model.FindEntityType(typeof(FeedbackEmbedding))?.GetTableName());
     }
 
     [Fact]
@@ -120,10 +124,32 @@ public sealed class AppDbContextModelTests
             uniqueIndex.GetDatabaseName());
     }
 
+    [Fact]
+    public void FeedbackEmbedding_UsesPgvectorAndWorkspaceScopedIndexes()
+    {
+        using var dbContext = CreateDbContext();
+        var embeddingEntity = dbContext.Model.FindEntityType(typeof(FeedbackEmbedding));
+        var vector = embeddingEntity?.FindProperty("_values");
+        var uniqueIndex = Assert.Single(
+            embeddingEntity!.GetIndexes(),
+            index => index.IsUnique);
+        var vectorIndex = Assert.Single(
+            embeddingEntity.GetIndexes(),
+            index => index.GetDatabaseName() == "ix_feedback_embeddings_embedding_cosine");
+
+        Assert.Equal("vector(1536)", vector!.GetColumnType());
+        Assert.Equal("hnsw", vectorIndex.GetMethod());
+        Assert.Equal(
+            [nameof(FeedbackEmbedding.WorkspaceId), nameof(FeedbackEmbedding.FeedbackId)],
+            uniqueIndex.Properties.Select(property => property.Name));
+    }
+
     private static AppDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql("Host=localhost;Database=pulsepilot;Username=pulsepilot")
+            .UseNpgsql(
+                "Host=localhost;Database=pulsepilot;Username=pulsepilot",
+                options => options.UseVector())
             .Options;
 
         return new AppDbContext(options);

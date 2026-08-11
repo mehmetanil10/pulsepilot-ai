@@ -11,6 +11,7 @@ internal sealed class FeedbackAnalysisProcessor(
     IFeedbackProcessingQueue processingQueue,
     IFeedbackRepository feedbackRepository,
     IFeedbackAnalysisRepository analysisRepository,
+    IFeedbackEmbeddingRepository embeddingRepository,
     ILLMClient llmClient,
     IUnitOfWork unitOfWork,
     IOptions<FeedbackProcessingOptions> options,
@@ -34,10 +35,24 @@ internal sealed class FeedbackAnalysisProcessor(
 
         try
         {
-            var (analysisResult, attempts) = await AnalyzeWithRetryAsync(
+            var embeddingInput = FeedbackEmbeddingSource.CreateText(
+                item.Title,
+                item.Content);
+            var sourceHash = FeedbackEmbeddingSource.ComputeHash(embeddingInput);
+            var (analysisResult, analysisAttempts) = await AnalyzeWithRetryAsync(
                 item,
                 cancellationToken);
-            var completed = await CompleteAsync(item, analysisResult, cancellationToken);
+            var (embeddingResult, embeddingAttempts) = await GenerateEmbeddingWithRetryAsync(
+                item.FeedbackId,
+                embeddingInput,
+                cancellationToken);
+            var attempts = Math.Max(analysisAttempts, embeddingAttempts);
+            var completed = await CompleteAsync(
+                item,
+                analysisResult,
+                embeddingResult,
+                sourceHash,
+                cancellationToken);
 
             return new FeedbackAnalysisProcessResult(
                 completed
@@ -75,6 +90,29 @@ internal sealed class FeedbackAnalysisProcessor(
             item.Content,
             item.Source);
 
+        return await ExecuteWithRetryAsync(
+            token => llmClient.AnalyzeFeedbackAsync(request, token),
+            cancellationToken);
+    }
+
+    private async Task<(FeedbackEmbeddingResult Result, int Attempts)> GenerateEmbeddingWithRetryAsync(
+        Guid feedbackId,
+        string embeddingInput,
+        CancellationToken cancellationToken)
+    {
+        var request = new FeedbackEmbeddingRequest(feedbackId, embeddingInput);
+
+        return await ExecuteWithRetryAsync(
+            token => llmClient.GenerateEmbeddingAsync(request, token),
+            cancellationToken);
+    }
+
+    private async Task<(T Result, int Attempts)> ExecuteWithRetryAsync<T>(
+        Func<CancellationToken, Task<T>> operation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+
         for (var attempt = 1; attempt <= _options.MaxAttempts; attempt++)
         {
             try
@@ -84,9 +122,7 @@ internal sealed class FeedbackAnalysisProcessor(
                 timeoutSource.CancelAfter(TimeSpan.FromSeconds(
                     _options.AnalysisTimeoutSeconds));
 
-                var result = await llmClient.AnalyzeFeedbackAsync(
-                    request,
-                    timeoutSource.Token);
+                var result = await operation(timeoutSource.Token);
 
                 return (result, attempt);
             }
@@ -127,7 +163,9 @@ internal sealed class FeedbackAnalysisProcessor(
 
     private async Task<bool> CompleteAsync(
         FeedbackProcessingItem item,
-        FeedbackAnalysisResult result,
+        FeedbackAnalysisResult analysisResult,
+        FeedbackEmbeddingResult embeddingResult,
+        string sourceHash,
         CancellationToken cancellationToken)
     {
         var feedback = await feedbackRepository.GetByIdAsync(
@@ -152,26 +190,51 @@ internal sealed class FeedbackAnalysisProcessor(
             analysis = FeedbackAnalysis.Create(
                 item.WorkspaceId,
                 item.FeedbackId,
-                result.Category,
-                result.Component,
-                result.Severity,
-                result.Sentiment,
-                result.Summary,
-                result.SuggestedAction,
-                result.Confidence,
+                analysisResult.Category,
+                analysisResult.Component,
+                analysisResult.Severity,
+                analysisResult.Sentiment,
+                analysisResult.Summary,
+                analysisResult.SuggestedAction,
+                analysisResult.Confidence,
                 analyzedAt);
             await analysisRepository.AddAsync(analysis, cancellationToken);
         }
         else
         {
             analysis.ReplaceResult(
-                result.Category,
-                result.Component,
-                result.Severity,
-                result.Sentiment,
-                result.Summary,
-                result.SuggestedAction,
-                result.Confidence,
+                analysisResult.Category,
+                analysisResult.Component,
+                analysisResult.Severity,
+                analysisResult.Sentiment,
+                analysisResult.Summary,
+                analysisResult.SuggestedAction,
+                analysisResult.Confidence,
+                analyzedAt);
+        }
+
+        var embedding = await embeddingRepository.GetByFeedbackIdAsync(
+            item.WorkspaceId,
+            item.FeedbackId,
+            cancellationToken);
+
+        if (embedding is null)
+        {
+            embedding = FeedbackEmbedding.Create(
+                item.WorkspaceId,
+                item.FeedbackId,
+                embeddingResult.Values,
+                embeddingResult.Model,
+                sourceHash,
+                analyzedAt);
+            await embeddingRepository.AddAsync(embedding, cancellationToken);
+        }
+        else
+        {
+            embedding.ReplaceResult(
+                embeddingResult.Values,
+                embeddingResult.Model,
+                sourceHash,
                 analyzedAt);
         }
 

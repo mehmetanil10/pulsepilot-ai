@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.Extensions.Options;
+using OpenAI.Embeddings;
 using OpenAI.Responses;
 using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.AI;
@@ -15,6 +16,7 @@ namespace PulsePilot.Infrastructure.AI;
 
 public sealed class OpenAILlmClient(
     ResponsesClient responsesClient,
+    EmbeddingClient embeddingClient,
     IOptions<OpenAIOptions> options,
     IValidator<FeedbackAnalysisResult> resultValidator) : ILLMClient
 {
@@ -145,6 +147,86 @@ public sealed class OpenAILlmClient(
             Summary = result.Summary.Trim(),
             SuggestedAction = result.SuggestedAction.Trim(),
         };
+    }
+
+    public async Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+        FeedbackEmbeddingRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (request.FeedbackId == Guid.Empty)
+        {
+            throw new ArgumentException("Feedback id is required.", nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Input))
+        {
+            throw new ArgumentException("Embedding input is required.", nameof(request));
+        }
+
+        if (!_options.Enabled)
+        {
+            throw new LlmProviderException(
+                LlmProviderFailureKind.NotConfigured,
+                "The AI provider is not enabled.");
+        }
+
+        OpenAIEmbedding embedding;
+
+        try
+        {
+            var clientResult = await embeddingClient.GenerateEmbeddingAsync(
+                request.Input,
+                new EmbeddingGenerationOptions
+                {
+                    Dimensions = _options.EmbeddingDimensions,
+                },
+                cancellationToken);
+            embedding = clientResult.Value;
+        }
+        catch (ClientResultException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            var isTransient = IsTransientStatus(exception.Status);
+
+            throw new LlmProviderException(
+                isTransient
+                    ? LlmProviderFailureKind.ProviderUnavailable
+                    : LlmProviderFailureKind.ProviderFailure,
+                isTransient
+                    ? "The AI provider is temporarily unavailable."
+                    : "The AI provider rejected the embedding request.",
+                isTransient);
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new LlmProviderException(
+                LlmProviderFailureKind.ProviderUnavailable,
+                "The AI provider is temporarily unavailable.",
+                isTransient: true,
+                exception);
+        }
+        catch (TaskCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new LlmProviderException(
+                LlmProviderFailureKind.ProviderUnavailable,
+                "The AI provider embedding request timed out.",
+                isTransient: true,
+                exception);
+        }
+
+        var values = embedding.ToFloats().ToArray();
+
+        if (values.Length != _options.EmbeddingDimensions
+            || values.Any(value => !float.IsFinite(value))
+            || values.All(value => value == 0))
+        {
+            throw new LlmProviderException(
+                LlmProviderFailureKind.InvalidResponse,
+                "The AI provider returned an invalid embedding.");
+        }
+
+        return new FeedbackEmbeddingResult(values, _options.EmbeddingModel);
     }
 
     private static void ThrowForNonCompletedResponse(ResponseResult response)

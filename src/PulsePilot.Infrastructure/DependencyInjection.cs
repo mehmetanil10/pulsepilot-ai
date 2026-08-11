@@ -6,10 +6,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using OpenAI;
+using OpenAI.Embeddings;
 using OpenAI.Responses;
+using Pgvector.EntityFrameworkCore;
 using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Application.Feedback;
 using PulsePilot.Infrastructure.AI;
 using PulsePilot.Infrastructure.Authentication;
 using PulsePilot.Infrastructure.Persistence;
@@ -46,6 +50,7 @@ public static class DependencyInjection
                 connectionString,
                 npgsqlOptions =>
                 {
+                    npgsqlOptions.UseVector();
                     npgsqlOptions.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName);
                     npgsqlOptions.EnableRetryOnFailure(
                         maxRetryCount: 3,
@@ -57,6 +62,24 @@ public static class DependencyInjection
         services.Configure<DemoSeedOptions>(
             configuration.GetSection(DemoSeedOptions.SectionName));
 
+        services.AddOptions<SemanticSearchOptions>()
+            .Bind(configuration.GetSection(SemanticSearchOptions.SectionName))
+            .Validate(
+                options => options.SimilarityThreshold is >= 0 and <= 1,
+                "Semantic search similarity threshold must be between 0 and 1.")
+            .Validate(
+                options => options.DefaultLimit is >= 1
+                    and <= SemanticSearchOptions.MaximumResultLimit,
+                $"Semantic search default limit must be between 1 and {SemanticSearchOptions.MaximumResultLimit}.")
+            .Validate(
+                options => options.MaxLimit is >= 1
+                    and <= SemanticSearchOptions.MaximumResultLimit,
+                $"Semantic search maximum limit must be between 1 and {SemanticSearchOptions.MaximumResultLimit}.")
+            .Validate(
+                options => options.DefaultLimit <= options.MaxLimit,
+                "Semantic search default limit cannot exceed its maximum limit.")
+            .ValidateOnStart();
+
         services.AddOptions<OpenAIOptions>()
             .Bind(configuration.GetSection(OpenAIOptions.SectionName))
             .Validate(
@@ -65,6 +88,12 @@ public static class DependencyInjection
             .Validate(
                 options => !string.IsNullOrWhiteSpace(options.Model),
                 "OpenAI model is required.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.EmbeddingModel),
+                "OpenAI embedding model is required.")
+            .Validate(
+                options => options.EmbeddingDimensions == PulsePilot.Domain.Feedback.FeedbackEmbedding.Dimensions,
+                $"OpenAI embedding dimensions must equal {PulsePilot.Domain.Feedback.FeedbackEmbedding.Dimensions}.")
             .Validate(
                 options => options.Endpoint is { IsAbsoluteUri: true }
                     && options.Endpoint.Scheme == Uri.UriSchemeHttps,
@@ -101,11 +130,39 @@ public static class DependencyInjection
             return new ResponsesClient(new ApiKeyCredential(apiKey), clientOptions);
         });
 
+        services.AddSingleton(serviceProvider =>
+        {
+            var openAIOptions = serviceProvider
+                .GetRequiredService<IOptions<OpenAIOptions>>()
+                .Value;
+            var apiKey = openAIOptions.Enabled
+                ? openAIOptions.ApiKey
+                : "openai-provider-disabled";
+            var clientOptions = new OpenAIClientOptions
+            {
+                Endpoint = openAIOptions.Endpoint,
+                NetworkTimeout = TimeSpan.FromSeconds(openAIOptions.NetworkTimeoutSeconds),
+                RetryPolicy = new ClientRetryPolicy(maxRetries: 0),
+                ClientLoggingOptions = new ClientLoggingOptions
+                {
+                    EnableLogging = false,
+                    EnableMessageLogging = false,
+                    EnableMessageContentLogging = false,
+                },
+            };
+
+            return new EmbeddingClient(
+                openAIOptions.EmbeddingModel,
+                new ApiKeyCredential(apiKey),
+                clientOptions);
+        });
+
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
         services.AddScoped<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
         services.AddScoped<IFeedbackAnalysisRepository, FeedbackAnalysisRepository>();
+        services.AddScoped<IFeedbackEmbeddingRepository, FeedbackEmbeddingRepository>();
         services.AddScoped<IFeedbackProcessingQueue, FeedbackProcessingQueue>();
         services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());

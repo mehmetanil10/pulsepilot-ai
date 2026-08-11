@@ -53,6 +53,8 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
         Assert.Equal(1, firstProcessing.Attempts);
 
         Guid analysisId;
+        Guid embeddingId;
+        string sourceHash;
 
         await using (var scope = serviceProvider.CreateAsyncScope())
         {
@@ -61,11 +63,17 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
                 .SingleAsync(entity => entity.Id == feedback.Id);
             var persistedAnalysis = await dbContext.FeedbackAnalyses
                 .SingleAsync(analysis => analysis.FeedbackId == feedback.Id);
+            var persistedEmbedding = await dbContext.FeedbackEmbeddings
+                .SingleAsync(embedding => embedding.FeedbackId == feedback.Id);
 
             Assert.Equal(ProcessingStatus.Completed, persistedFeedback.ProcessingStatus);
             Assert.Null(persistedFeedback.ProcessingLeaseId);
             Assert.Equal(FirstResult.Summary, persistedAnalysis.Summary);
+            Assert.Equal(FeedbackEmbedding.Dimensions, persistedEmbedding.Values.Count);
+            Assert.Equal("integration-test-embedding-model", persistedEmbedding.Model);
             analysisId = persistedAnalysis.Id;
+            embeddingId = persistedEmbedding.Id;
+            sourceHash = persistedEmbedding.SourceHash;
 
             persistedFeedback.UpdateDetails(
                 "Dashboard is slow",
@@ -88,9 +96,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
                 .SingleAsync(entity => entity.Id == feedback.Id);
             var persistedAnalysis = await dbContext.FeedbackAnalyses
                 .SingleAsync(analysis => analysis.FeedbackId == feedback.Id);
+            var persistedEmbedding = await dbContext.FeedbackEmbeddings
+                .SingleAsync(embedding => embedding.FeedbackId == feedback.Id);
 
             Assert.Equal(ProcessingStatus.Completed, persistedFeedback.ProcessingStatus);
             Assert.Equal(analysisId, persistedAnalysis.Id);
+            Assert.Equal(embeddingId, persistedEmbedding.Id);
+            Assert.NotEqual(sourceHash, persistedEmbedding.SourceHash);
             Assert.Equal(UpdatedResult.Category, persistedAnalysis.Category);
             Assert.Equal(UpdatedResult.Component, persistedAnalysis.Component);
             Assert.Equal(UpdatedResult.Summary, persistedAnalysis.Summary);
@@ -159,6 +171,11 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
             .FeedbackAnalyses
             .Where(analysis => analysis.FeedbackId == feedback.Id)
             .ToListAsync());
+        Assert.Empty(await scope.ServiceProvider
+            .GetRequiredService<AppDbContext>()
+            .FeedbackEmbeddings
+            .Where(embedding => embedding.FeedbackId == feedback.Id)
+            .ToListAsync());
     }
 
     [Fact]
@@ -199,6 +216,9 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
         Assert.Empty(await dbContext.FeedbackAnalyses
             .Where(analysis => analysis.FeedbackId == feedback.Id)
             .ToListAsync());
+        Assert.Empty(await dbContext.FeedbackEmbeddings
+            .Where(embedding => embedding.FeedbackId == feedback.Id)
+            .ToListAsync());
 
         var processingLeaseId = persistedFeedback.StartProcessing(DateTimeOffset.UtcNow);
         persistedFeedback.FailProcessing(processingLeaseId, DateTimeOffset.UtcNow);
@@ -228,6 +248,70 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
             .SingleAsync(entity => entity.Id == feedback.Id);
 
         Assert.Equal(ProcessingStatus.Failed, persistedFeedback.ProcessingStatus);
+    }
+
+    [Fact]
+    public async Task Processor_RetriesTransientEmbeddingFailureAndCompletes()
+    {
+        var feedback = await SeedFeedbackAsync("processor-embedding-retry");
+        var fakeClient = new EmbeddingSequenceLlmClient(
+            _ => throw new LlmProviderException(
+                LlmProviderFailureKind.ProviderUnavailable,
+                "The test embedding provider is temporarily unavailable.",
+                isTransient: true),
+            _ => throw new LlmProviderException(
+                LlmProviderFailureKind.ProviderUnavailable,
+                "The test embedding provider is temporarily unavailable.",
+                isTransient: true),
+            _ => Task.FromResult(CreateEmbeddingResult()));
+        await using var serviceProvider = CreateProcessorProvider(fakeClient);
+
+        var result = await ProcessNextAsync(serviceProvider);
+
+        Assert.Equal(FeedbackAnalysisProcessStatus.Succeeded, result.Status);
+        Assert.Equal(3, result.Attempts);
+        Assert.Equal(1, fakeClient.AnalysisCallCount);
+        Assert.Equal(3, fakeClient.EmbeddingCallCount);
+
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        Assert.Single(await dbContext.FeedbackAnalyses
+            .Where(analysis => analysis.FeedbackId == feedback.Id)
+            .ToListAsync());
+        Assert.Single(await dbContext.FeedbackEmbeddings
+            .Where(embedding => embedding.FeedbackId == feedback.Id)
+            .ToListAsync());
+    }
+
+    [Fact]
+    public async Task Processor_PermanentEmbeddingFailurePersistsNoPartialResult()
+    {
+        var feedback = await SeedFeedbackAsync("processor-embedding-failure");
+        var fakeClient = new EmbeddingSequenceLlmClient(
+            _ => throw new LlmProviderException(
+                LlmProviderFailureKind.ProviderFailure,
+                "The test embedding provider rejected the request."));
+        await using var serviceProvider = CreateProcessorProvider(fakeClient);
+
+        var result = await ProcessNextAsync(serviceProvider);
+
+        Assert.Equal(FeedbackAnalysisProcessStatus.Failed, result.Status);
+        Assert.Equal(LlmProviderFailureKind.ProviderFailure, result.FailureKind);
+        Assert.Equal(1, fakeClient.AnalysisCallCount);
+        Assert.Equal(1, fakeClient.EmbeddingCallCount);
+
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedFeedback = await dbContext.Feedback
+            .SingleAsync(entity => entity.Id == feedback.Id);
+
+        Assert.Equal(ProcessingStatus.Failed, persistedFeedback.ProcessingStatus);
+        Assert.Empty(await dbContext.FeedbackAnalyses
+            .Where(analysis => analysis.FeedbackId == feedback.Id)
+            .ToListAsync());
+        Assert.Empty(await dbContext.FeedbackEmbeddings
+            .Where(embedding => embedding.FeedbackId == feedback.Id)
+            .ToListAsync());
     }
 
     private ServiceProvider CreateProcessorProvider(
@@ -321,6 +405,15 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
 
             return responses[index](request);
         }
+
+        public Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+            FeedbackEmbeddingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult(CreateEmbeddingResult());
+        }
     }
 
     private sealed class BlockingLlmClient : ILLMClient
@@ -345,6 +438,15 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
         {
             _result.TrySetResult(result);
         }
+
+        public Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+            FeedbackEmbeddingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult(CreateEmbeddingResult());
+        }
     }
 
     private sealed class TimeoutLlmClient : ILLMClient
@@ -362,5 +464,58 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
 
             throw new InvalidOperationException("The timeout test should always be cancelled.");
         }
+
+        public Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+            FeedbackEmbeddingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult(CreateEmbeddingResult());
+        }
+    }
+
+    private sealed class EmbeddingSequenceLlmClient(
+        params Func<FeedbackEmbeddingRequest, Task<FeedbackEmbeddingResult>>[] responses)
+        : ILLMClient
+    {
+        private int _analysisCallCount;
+        private int _embeddingCallCount;
+
+        public int AnalysisCallCount => _analysisCallCount;
+
+        public int EmbeddingCallCount => _embeddingCallCount;
+
+        public Task<FeedbackAnalysisResult> AnalyzeFeedbackAsync(
+            FeedbackAnalysisRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _analysisCallCount);
+
+            return Task.FromResult(FirstResult);
+        }
+
+        public Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+            FeedbackEmbeddingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var index = Interlocked.Increment(ref _embeddingCallCount) - 1;
+
+            if (index >= responses.Length)
+            {
+                throw new InvalidOperationException("No fake embedding response is configured.");
+            }
+
+            return responses[index](request);
+        }
+    }
+
+    private static FeedbackEmbeddingResult CreateEmbeddingResult()
+    {
+        return new FeedbackEmbeddingResult(
+            Enumerable.Repeat(0.1f, FeedbackEmbedding.Dimensions).ToArray(),
+            "integration-test-embedding-model");
     }
 }

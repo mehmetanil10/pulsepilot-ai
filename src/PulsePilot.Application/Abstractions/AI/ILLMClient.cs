@@ -7,4 +7,8 @@ public interface ILLMClient
     Task<FeedbackAnalysisResult> AnalyzeFeedbackAsync(
         FeedbackAnalysisRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+        FeedbackEmbeddingRequest request,
+        CancellationToken cancellationToken = default);
 }

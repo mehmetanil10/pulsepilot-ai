@@ -74,5 +74,17 @@ public sealed class LlmClientContractTests
 
             return Task.FromResult(PaymentFailureResult);
         }
+
+        public Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+            FeedbackEmbeddingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult(new FeedbackEmbeddingResult(
+                Enumerable.Repeat(0.1f, FeedbackEmbedding.Dimensions).ToArray(),
+                "deterministic-test-model"));
+        }
     }
 }

@@ -11,10 +11,12 @@ foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, and idempotent demo seed are ready. The AI intelligence foundation now
 includes provider-independent structured analysis contracts, a persisted
-`FeedbackAnalysis` model, and an OpenAI Responses API adapter with strict
-Structured Outputs. A separate database-backed worker now claims pending
-feedback with expiring leases, retries transient failures, and persists analysis
-without holding a transaction during the AI call. EF Core migrations and
+`FeedbackAnalysis` model, an OpenAI Responses API adapter with strict Structured
+Outputs, and pgvector-backed feedback embeddings. A separate database-backed
+worker now claims pending feedback with expiring leases, retries transient
+failures, and atomically persists analysis plus embedding without holding a
+transaction during either AI call. Cosine similarity search is workspace-scoped
+and available through the Feedback API. EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
 
@@ -102,7 +104,7 @@ password is required only when seeding is enabled and must never be committed.
 After the API becomes healthy, sign in through `POST /api/auth/login` with the
 configured demo email and password. The generated feedback spans Payments,
 Authentication, Dashboard, Mobile, Reporting, Performance, and Feature Requests,
-with intentionally related reports for later semantic clustering work.
+with intentionally related reports for semantic search and later clustering work.
 
 ## API infrastructure
 
@@ -139,14 +141,17 @@ come from validated token claims and are never accepted from the request body:
 - `GET /api/feedback/{id}`
 - `PUT /api/feedback/{id}`
 - `DELETE /api/feedback/{id}`
+- `GET /api/feedback/{id}/analysis`
+- `POST /api/feedback/{id}/analysis/retry`
+- `GET /api/feedback/{id}/similar?limit=10`
 
 Deletion is implemented as a soft delete. The MVP accepts `manual` and `api` as
 creation sources; API enums use camel-case string values.
 
 ## AI intelligence foundation
 
-`ILLMClient` defines the provider-independent feedback analysis boundary. Its
-structured result contains category, component, severity, sentiment, summary,
+`ILLMClient` defines provider-independent structured analysis and embedding
+boundaries. The analysis result contains category, component, severity, sentiment, summary,
 suggested action, and confidence. Application validation and domain invariants
 reject unsupported enum values, severity outside 1–5, confidence outside 0–1,
 and empty or oversized text before persistence.
@@ -154,6 +159,12 @@ and empty or oversized text before persistence.
 `FeedbackAnalysis` stores one current analysis per workspace-scoped feedback.
 Database foreign keys prevent an analysis from referencing feedback in another
 workspace, and PostgreSQL check constraints mirror the structured result rules.
+
+`FeedbackEmbedding` stores one 1,536-dimensional vector per workspace-scoped
+feedback. PostgreSQL's `vector` extension and a cosine HNSW index support nearest
+neighbor lookup. The API returns only completed, non-deleted feedback from the
+same workspace whose similarity meets the configured threshold; the source
+embedding must match the feedback's current title and content.
 
 The Infrastructure adapter uses the official OpenAI .NET SDK and Responses API.
 It requests a strict JSON Schema result, then deserializes and validates the
@@ -170,6 +181,9 @@ OpenAI access is disabled by default. To enable it locally, set these values in
 OPENAI_ENABLED=true
 OPENAI_API_KEY=replace-with-a-project-api-key
 OPENAI_MODEL=gpt-5.6-luna
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_EMBEDDING_DIMENSIONS=1536
+SIMILARITY_THRESHOLD=0.80
 FEEDBACK_PROCESSING_ENABLED=true
 ```
 
@@ -179,16 +193,21 @@ multiple worker replicas cannot process the same active job. AI calls run
 outside database transactions. Transient failures use bounded exponential
 backoff with jitter; permanent failures move the feedback to `Failed`. Stale
 leases are recovered after the configured threshold, while late results from an
-expired lease are discarded.
+expired lease are discarded. Analysis and embedding calls each use the same
+bounded retry and timeout policy. A feedback row is marked `Completed` only after
+both validated results are saved atomically.
 
 Analysis state and the latest persisted result are available through:
 
 - `GET /api/feedback/{id}/analysis`
 - `POST /api/feedback/{id}/analysis/retry`
+- `GET /api/feedback/{id}/similar?limit=10`
 
 The retry endpoint only accepts failed processing records. Updating feedback
 returns it to `Pending`; an older analysis remains visible with
-`isCurrent: false` until the worker replaces it.
+`isCurrent: false` until the worker replaces it. Similarity search returns `409`
+while the source embedding is missing or stale. The threshold defaults to `0.80`,
+and result limits are validated from configuration.
 
 ## Database migrations
 
