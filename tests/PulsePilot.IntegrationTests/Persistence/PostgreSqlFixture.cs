@@ -15,6 +15,8 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         .WithPassword("pulsepilot_test")
         .Build();
 
+    public string ConnectionString => _container.GetConnectionString();
+
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
@@ -35,7 +37,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     {
         var configurationValues = new Dictionary<string, string?>
         {
-            ["ConnectionStrings:Database"] = _container.GetConnectionString(),
+            ["ConnectionStrings:Database"] = ConnectionString,
         };
 
         var configuration = new ConfigurationBuilder()
@@ -43,6 +45,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
             .Build();
 
         var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
         services.AddInfrastructure(configuration);
 
         return services.BuildServiceProvider(validateScopes: true);

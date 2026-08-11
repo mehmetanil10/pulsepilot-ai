@@ -15,15 +15,20 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString(DatabaseConnectionStringName);
+        ArgumentNullException.ThrowIfNull(configuration);
 
-        if (string.IsNullOrWhiteSpace(connectionString))
+        services.AddDbContext<AppDbContext>((serviceProvider, options) =>
         {
-            throw new InvalidOperationException(
-                $"Connection string '{DatabaseConnectionStringName}' is required.");
-        }
+            var runtimeConfiguration = serviceProvider.GetRequiredService<IConfiguration>();
+            var connectionString = runtimeConfiguration.GetConnectionString(
+                DatabaseConnectionStringName);
 
-        services.AddDbContext<AppDbContext>(options =>
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException(
+                    $"Connection string '{DatabaseConnectionStringName}' is required.");
+            }
+
             options.UseNpgsql(
                 connectionString,
                 npgsqlOptions =>
@@ -33,7 +38,8 @@ public static class DependencyInjection
                         maxRetryCount: 3,
                         maxRetryDelay: TimeSpan.FromSeconds(5),
                         errorCodesToAdd: null);
-                }));
+                });
+        });
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();

@@ -7,8 +7,9 @@ issues, and keep critical actions behind human approval.
 ## Current status
 
 Sprint 1 is in progress. The .NET 10 Clean Architecture foundation, core domain
-model, and PostgreSQL persistence layer are ready. EF Core migrations and
-Testcontainers-backed repository integration tests are included.
+model, PostgreSQL persistence layer, and API observability baseline are ready.
+EF Core migrations and Testcontainers-backed API and repository integration
+tests are included.
 
 ## Solution structure
 
@@ -31,6 +32,15 @@ dotnet test PulsePilot.sln --configuration Release --no-build
 
 The integration tests require a running Docker engine and create disposable
 PostgreSQL containers automatically.
+
+## API infrastructure
+
+- FluentValidation validators are discovered automatically from the Application
+  and API assemblies.
+- Errors use RFC-compatible Problem Details responses and include a `traceId`.
+- Serilog emits structured request and application logs to the console.
+- Swagger UI is available at `/swagger` in the Development environment.
+- `/health/live` checks process liveness; `/health/ready` also checks PostgreSQL.
 
 ## Database migrations
 
