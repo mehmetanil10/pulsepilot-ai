@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Infrastructure.Authentication;
 using PulsePilot.Infrastructure.Persistence;
 using PulsePilot.Infrastructure.Persistence.Repositories;
 
@@ -16,6 +18,8 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+
+        services.AddOptions();
 
         services.AddDbContext<AppDbContext>((serviceProvider, options) =>
         {
@@ -46,6 +50,8 @@ public static class DependencyInjection
         services.AddScoped<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());
+        services.AddSingleton<IPasswordHasher, AspNetCorePasswordHasher>();
+        services.AddSingleton<IAccessTokenGenerator, JwtAccessTokenGenerator>();
 
         return services;
     }

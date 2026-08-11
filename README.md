@@ -7,9 +7,9 @@ issues, and keep critical actions behind human approval.
 ## Current status
 
 Sprint 1 is in progress. The .NET 10 Clean Architecture foundation, core domain
-model, PostgreSQL persistence layer, and API observability baseline are ready.
-EF Core migrations and Testcontainers-backed API and repository integration
-tests are included.
+model, PostgreSQL persistence layer, JWT authentication, and API observability
+baseline are ready. EF Core migrations and Testcontainers-backed API and
+repository integration tests are included.
 
 ## Solution structure
 
@@ -41,6 +41,22 @@ PostgreSQL containers automatically.
 - Serilog emits structured request and application logs to the console.
 - Swagger UI is available at `/swagger` in the Development environment.
 - `/health/live` checks process liveness; `/health/ready` also checks PostgreSQL.
+
+## Authentication
+
+Register and login endpoints issue signed JWT bearer tokens scoped to the user's
+workspace and role:
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+
+Provide the signing secret through configuration. Use at least 32 random bytes
+and never commit a production secret:
+
+```powershell
+$env:Jwt__Secret = "replace-with-a-secure-random-secret"
+```
 
 ## Database migrations
 

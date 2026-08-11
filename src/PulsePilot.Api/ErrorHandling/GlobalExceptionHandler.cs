@@ -56,6 +56,10 @@ public sealed class GlobalExceptionHandler(
         ProblemDetails problemDetails = exception switch
         {
             ValidationException validationException => CreateValidationProblemDetails(validationException),
+            InvalidCredentialsException => CreateKnownProblemDetails(
+                StatusCodes.Status401Unauthorized,
+                "Authentication failed",
+                exception.Message),
             NotFoundException => CreateKnownProblemDetails(
                 StatusCodes.Status404NotFound,
                 "Resource not found",

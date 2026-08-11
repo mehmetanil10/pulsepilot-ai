@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
+using PulsePilot.Api.Authentication;
 using PulsePilot.Api.ErrorHandling;
 using PulsePilot.Api.HealthChecks;
 using PulsePilot.Api.Validation;
@@ -31,6 +32,7 @@ builder.Services.AddProblemDetails(options =>
     };
 });
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddJwtAuthentication();
 
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddScoped<FluentValidationActionFilter>();
@@ -78,18 +80,19 @@ if (app.Environment.IsDevelopment())
         options.SwaggerEndpoint("/swagger/v1/swagger.json", "PulsePilot AI API v1"));
 }
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false,
     ResponseWriter = HealthCheckResponseWriter.WriteAsync,
-});
+}).AllowAnonymous();
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("ready"),
     ResponseWriter = HealthCheckResponseWriter.WriteAsync,
-});
+}).AllowAnonymous();
 app.MapControllers();
 
 app.Run();
