@@ -1,8 +1,16 @@
+#pragma warning disable OPENAI001
+
+using System.ClientModel;
+using System.ClientModel.Primitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using OpenAI.Responses;
+using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Infrastructure.AI;
 using PulsePilot.Infrastructure.Authentication;
 using PulsePilot.Infrastructure.Persistence;
 using PulsePilot.Infrastructure.Persistence.Repositories;
@@ -49,6 +57,50 @@ public static class DependencyInjection
         services.Configure<DemoSeedOptions>(
             configuration.GetSection(DemoSeedOptions.SectionName));
 
+        services.AddOptions<OpenAIOptions>()
+            .Bind(configuration.GetSection(OpenAIOptions.SectionName))
+            .Validate(
+                options => !options.Enabled || !string.IsNullOrWhiteSpace(options.ApiKey),
+                "OpenAI API key is required when the provider is enabled.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.Model),
+                "OpenAI model is required.")
+            .Validate(
+                options => options.Endpoint is { IsAbsoluteUri: true }
+                    && options.Endpoint.Scheme == Uri.UriSchemeHttps,
+                "OpenAI endpoint must be an absolute HTTPS URI.")
+            .Validate(
+                options => options.MaxOutputTokenCount is >= 128 and <= 16_384,
+                "OpenAI max output token count must be between 128 and 16384.")
+            .Validate(
+                options => options.NetworkTimeoutSeconds is >= 1 and <= 300,
+                "OpenAI network timeout must be between 1 and 300 seconds.")
+            .ValidateOnStart();
+
+        services.AddSingleton(serviceProvider =>
+        {
+            var openAIOptions = serviceProvider
+                .GetRequiredService<IOptions<OpenAIOptions>>()
+                .Value;
+            var apiKey = openAIOptions.Enabled
+                ? openAIOptions.ApiKey
+                : "openai-provider-disabled";
+            var clientOptions = new ResponsesClientOptions
+            {
+                Endpoint = openAIOptions.Endpoint,
+                NetworkTimeout = TimeSpan.FromSeconds(openAIOptions.NetworkTimeoutSeconds),
+                RetryPolicy = new ClientRetryPolicy(maxRetries: 0),
+                ClientLoggingOptions = new ClientLoggingOptions
+                {
+                    EnableLogging = false,
+                    EnableMessageLogging = false,
+                    EnableMessageContentLogging = false,
+                },
+            };
+
+            return new ResponsesClient(new ApiKeyCredential(apiKey), clientOptions);
+        });
+
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
         services.AddScoped<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
@@ -58,7 +110,10 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork>(provider => provider.GetRequiredService<AppDbContext>());
         services.AddSingleton<IPasswordHasher, AspNetCorePasswordHasher>();
         services.AddSingleton<IAccessTokenGenerator, JwtAccessTokenGenerator>();
+        services.AddScoped<ILLMClient, OpenAILlmClient>();
 
         return services;
     }
 }
+
+#pragma warning restore OPENAI001

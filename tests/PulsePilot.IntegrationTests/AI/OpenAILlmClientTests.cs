@@ -1,0 +1,377 @@
+#pragma warning disable OPENAI001
+
+using System.ClientModel;
+using System.ClientModel.Primitives;
+using System.Net;
+using System.Text;
+using System.Text.Json;
+using FluentValidation;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using OpenAI.Responses;
+using PulsePilot.Application;
+using PulsePilot.Application.AI;
+using PulsePilot.Application.Common.Exceptions;
+using PulsePilot.Domain.Feedback;
+using PulsePilot.Infrastructure;
+using PulsePilot.Infrastructure.AI;
+
+namespace PulsePilot.IntegrationTests.AI;
+
+public sealed class OpenAILlmClientTests
+{
+    private const string SuccessfulAnalysis = """
+        {
+          "category": "Bug",
+          "component": "Payments",
+          "severity": 4,
+          "sentiment": "Negative",
+          "summary": "Card creation fails after the latest update.",
+          "suggestedAction": "Inspect payment tokenization failures and add a regression test.",
+          "confidence": 0.94
+        }
+        """;
+
+    [Fact]
+    public async Task AnalyzeFeedbackAsync_SendsStrictSchemaAndReturnsValidatedResult()
+    {
+        string? requestBody = null;
+        var client = CreateClient(async (request, cancellationToken) =>
+        {
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateJsonResponse(CreateResponseJson(
+                "completed",
+                "output_text",
+                SuccessfulAnalysis));
+        });
+
+        var result = await client.AnalyzeFeedbackAsync(CreateRequest());
+
+        Assert.Equal(FeedbackCategory.Bug, result.Category);
+        Assert.Equal(FeedbackComponent.Payments, result.Component);
+        Assert.Equal(4, result.Severity);
+        Assert.Equal(FeedbackSentiment.Negative, result.Sentiment);
+        Assert.Equal(0.94m, result.Confidence);
+
+        Assert.NotNull(requestBody);
+        using var requestDocument = JsonDocument.Parse(requestBody);
+        var root = requestDocument.RootElement;
+
+        Assert.Equal(OpenAIOptions.DefaultModel, root.GetProperty("model").GetString());
+        Assert.False(root.GetProperty("store").GetBoolean());
+
+        var format = root
+            .GetProperty("text")
+            .GetProperty("format");
+        Assert.Equal("json_schema", format.GetProperty("type").GetString());
+        Assert.True(format.GetProperty("strict").GetBoolean());
+
+        var schema = format.GetProperty("schema");
+        Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
+        Assert.Equal(7, schema.GetProperty("required").GetArrayLength());
+        Assert.Contains(
+            schema.GetProperty("properties")
+                .GetProperty("category")
+                .GetProperty("enum")
+                .EnumerateArray()
+                .Select(item => item.GetString()),
+            value => value == nameof(FeedbackCategory.Bug));
+
+        var inputText = root
+            .GetProperty("input")[0]
+            .GetProperty("content")[0]
+            .GetProperty("text")
+            .GetString();
+        Assert.Contains("cannot add my credit card", inputText, StringComparison.Ordinal);
+        Assert.DoesNotContain(CreateRequest().FeedbackId.ToString(), inputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("integration-test-api-key", requestBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnalyzeFeedbackAsync_MapsRefusalToProviderNeutralFailure()
+    {
+        var client = CreateClient((_, _) => Task.FromResult(CreateJsonResponse(
+            CreateResponseJson("completed", "refusal", "I cannot process this content."))));
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            client.AnalyzeFeedbackAsync(CreateRequest()));
+
+        Assert.Equal(LlmProviderFailureKind.Refused, exception.FailureKind);
+        Assert.False(exception.IsTransient);
+        Assert.DoesNotContain("I cannot process", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnalyzeFeedbackAsync_MapsIncompleteResponse()
+    {
+        var client = CreateClient((_, _) => Task.FromResult(CreateJsonResponse(
+            CreateResponseJson(
+                "incomplete",
+                contentKind: null,
+                content: null,
+                incompleteReason: "max_output_tokens"))));
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            client.AnalyzeFeedbackAsync(CreateRequest()));
+
+        Assert.Equal(LlmProviderFailureKind.Incomplete, exception.FailureKind);
+        Assert.False(exception.IsTransient);
+    }
+
+    [Fact]
+    public async Task AnalyzeFeedbackAsync_RejectsResultOutsideApplicationContract()
+    {
+        const string invalidAnalysis = """
+            {
+              "category": "Bug",
+              "component": "Payments",
+              "severity": 4,
+              "sentiment": "Negative",
+              "summary": "Card creation fails.",
+              "suggestedAction": "Investigate.",
+              "confidence": 1.5
+            }
+            """;
+        var client = CreateClient((_, _) => Task.FromResult(CreateJsonResponse(
+            CreateResponseJson("completed", "output_text", invalidAnalysis))));
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            client.AnalyzeFeedbackAsync(CreateRequest()));
+
+        Assert.Equal(LlmProviderFailureKind.InvalidResponse, exception.FailureKind);
+        Assert.False(exception.IsTransient);
+    }
+
+    [Fact]
+    public async Task AnalyzeFeedbackAsync_RejectsMalformedJson()
+    {
+        var client = CreateClient((_, _) => Task.FromResult(CreateJsonResponse(
+            CreateResponseJson("completed", "output_text", "{not-json"))));
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            client.AnalyzeFeedbackAsync(CreateRequest()));
+
+        Assert.Equal(LlmProviderFailureKind.InvalidResponse, exception.FailureKind);
+        Assert.False(exception.IsTransient);
+    }
+
+    [Fact]
+    public async Task AnalyzeFeedbackAsync_ClassifiesRateLimitAsTransient()
+    {
+        var callCount = 0;
+        var client = CreateClient((_, _) =>
+        {
+            callCount++;
+            return Task.FromResult(CreateJsonResponse(
+                """
+                {
+                  "error": {
+                    "message": "Rate limit reached.",
+                    "type": "rate_limit_error",
+                    "param": null,
+                    "code": "rate_limit_exceeded"
+                  }
+                }
+                """,
+                HttpStatusCode.TooManyRequests));
+        });
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            client.AnalyzeFeedbackAsync(CreateRequest()));
+
+        Assert.Equal(LlmProviderFailureKind.ProviderUnavailable, exception.FailureKind);
+        Assert.True(exception.IsTransient);
+        Assert.Equal(1, callCount);
+        Assert.DoesNotContain("Rate limit reached", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Rate limit reached", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnalyzeFeedbackAsync_DoesNotCallProviderWhenDisabled()
+    {
+        var callCount = 0;
+        var client = CreateClient(
+            (_, _) =>
+            {
+                callCount++;
+                return Task.FromResult(CreateJsonResponse(
+                    CreateResponseJson("completed", "output_text", SuccessfulAnalysis)));
+            },
+            enabled: false);
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            client.AnalyzeFeedbackAsync(CreateRequest()));
+
+        Assert.Equal(LlmProviderFailureKind.NotConfigured, exception.FailureKind);
+        Assert.Equal(0, callCount);
+    }
+
+    [Fact]
+    public void OpenAIOptions_RequireApiKeyWhenProviderIsEnabled()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["OpenAI:Enabled"] = "true",
+                ["OpenAI:ApiKey"] = string.Empty,
+            })
+            .Build();
+        using var serviceProvider = new ServiceCollection()
+            .AddApplication()
+            .AddInfrastructure(configuration)
+            .BuildServiceProvider();
+
+        Assert.Throws<OptionsValidationException>(() =>
+            serviceProvider.GetRequiredService<IOptions<OpenAIOptions>>().Value);
+    }
+
+    private static OpenAILlmClient CreateClient(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responseFactory,
+        bool enabled = true)
+    {
+        var httpClient = new HttpClient(new StubHttpMessageHandler(responseFactory));
+        var responsesClient = new ResponsesClient(
+            new ApiKeyCredential("integration-test-api-key"),
+            new ResponsesClientOptions
+            {
+                Endpoint = new Uri("https://openai.test/v1/"),
+                Transport = new HttpClientPipelineTransport(httpClient),
+                RetryPolicy = new ClientRetryPolicy(maxRetries: 0),
+                ClientLoggingOptions = new ClientLoggingOptions
+                {
+                    EnableLogging = false,
+                    EnableMessageLogging = false,
+                    EnableMessageContentLogging = false,
+                },
+            });
+        var options = Options.Create(new OpenAIOptions
+        {
+            Enabled = enabled,
+            ApiKey = enabled ? "integration-test-api-key" : string.Empty,
+        });
+
+        return new OpenAILlmClient(
+            responsesClient,
+            options,
+            new FeedbackAnalysisResultValidator());
+    }
+
+    private static FeedbackAnalysisRequest CreateRequest()
+    {
+        return new FeedbackAnalysisRequest(
+            Guid.Parse("0198a891-57b0-7000-8000-000000000010"),
+            "Card cannot be added",
+            "After the latest update I cannot add my credit card.",
+            FeedbackSource.Manual);
+    }
+
+    private static HttpResponseMessage CreateJsonResponse(
+        string json,
+        HttpStatusCode statusCode = HttpStatusCode.OK)
+    {
+        return new HttpResponseMessage(statusCode)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json"),
+        };
+    }
+
+    private static string CreateResponseJson(
+        string status,
+        string? contentKind,
+        string? content,
+        string? incompleteReason = null)
+    {
+        object[] output = contentKind is null
+            ? []
+            :
+            [
+                new
+                {
+                    id = "msg_test",
+                    type = "message",
+                    status = "completed",
+                    role = "assistant",
+                    content = new[]
+                    {
+                        contentKind == "refusal"
+                            ? new
+                            {
+                                type = contentKind,
+                                text = (string?)null,
+                                refusal = content,
+                            }
+                            : new
+                            {
+                                type = contentKind,
+                                text = content,
+                                refusal = (string?)null,
+                            },
+                    },
+                },
+            ];
+
+        return JsonSerializer.Serialize(new
+        {
+            id = "resp_test",
+            @object = "response",
+            created_at = 1_754_000_000,
+            status,
+            background = false,
+            error = (object?)null,
+            incomplete_details = incompleteReason is null
+                ? null
+                : new { reason = incompleteReason },
+            instructions = (string?)null,
+            max_output_tokens = 1_000,
+            model = OpenAIOptions.DefaultModel,
+            output,
+            parallel_tool_calls = true,
+            previous_response_id = (string?)null,
+            reasoning = new
+            {
+                effort = (string?)null,
+                summary = (string?)null,
+            },
+            store = false,
+            temperature = 1,
+            text = new
+            {
+                format = new
+                {
+                    type = "json_schema",
+                    name = "feedback_analysis",
+                    schema = new { },
+                    strict = true,
+                },
+            },
+            tool_choice = "auto",
+            tools = Array.Empty<object>(),
+            top_p = 1,
+            truncation = "disabled",
+            usage = new
+            {
+                input_tokens = 10,
+                input_tokens_details = new { cached_tokens = 0 },
+                output_tokens = 20,
+                output_tokens_details = new { reasoning_tokens = 0 },
+                total_tokens = 30,
+            },
+            metadata = new { },
+        });
+    }
+
+    private sealed class StubHttpMessageHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responseFactory)
+        : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return responseFactory(request, cancellationToken);
+        }
+    }
+}
+
+#pragma warning restore OPENAI001

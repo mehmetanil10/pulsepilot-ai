@@ -10,9 +10,10 @@ Sprint 1 is complete and Sprint 2 is in progress. The .NET 10 Clean Architecture
 foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, and idempotent demo seed are ready. The AI intelligence foundation now
-includes provider-independent structured analysis contracts and a persisted
-`FeedbackAnalysis` model. EF Core migrations and Testcontainers-backed API,
-repository, and seed integration tests are included.
+includes provider-independent structured analysis contracts, a persisted
+`FeedbackAnalysis` model, and an OpenAI Responses API adapter with strict
+Structured Outputs. EF Core migrations and Testcontainers-backed API,
+repository, seed, and provider-contract integration tests are included.
 
 ## Solution structure
 
@@ -148,8 +149,28 @@ and empty or oversized text before persistence.
 `FeedbackAnalysis` stores one current analysis per workspace-scoped feedback.
 Database foreign keys prevent an analysis from referencing feedback in another
 workspace, and PostgreSQL check constraints mirror the structured result rules.
-The real AI provider, retry/timeout policies, and background processing are
-introduced in subsequent Sprint 2 tasks.
+
+The Infrastructure adapter uses the official OpenAI .NET SDK and Responses API.
+It requests a strict JSON Schema result, then deserializes and validates the
+result again before returning it to the application. Provider refusal,
+incomplete output, malformed JSON, contract violations, and transient HTTP
+failures are represented by provider-neutral application errors. SDK request and
+content logging is disabled so feedback text and API credentials are not written
+to application logs.
+
+OpenAI access is disabled by default. To enable it locally, set these values in
+`.env`; never commit a real key:
+
+```dotenv
+OPENAI_ENABLED=true
+OPENAI_API_KEY=replace-with-a-project-api-key
+OPENAI_MODEL=gpt-5.6-luna
+```
+
+The API validates configuration at startup when the provider is enabled. The
+adapter does not persist provider responses, and provider-side retries and
+background analysis orchestration are intentionally reserved for the next
+Sprint 2 task.
 
 ## Database migrations
 

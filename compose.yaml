@@ -14,6 +14,12 @@ x-api-environment: &api-environment
   Jwt__Audience: ${JWT_AUDIENCE:-PulsePilot.Clients}
   Jwt__Secret: ${JWT_SECRET:?Set JWT_SECRET in .env}
   Jwt__ExpirationMinutes: ${JWT_EXPIRATION_MINUTES:-60}
+  OpenAI__Enabled: ${OPENAI_ENABLED:-false}
+  OpenAI__ApiKey: ${OPENAI_API_KEY:-}
+  OpenAI__Model: ${OPENAI_MODEL:-gpt-5.6-luna}
+  OpenAI__Endpoint: ${OPENAI_ENDPOINT:-https://api.openai.com/v1/}
+  OpenAI__MaxOutputTokenCount: ${OPENAI_MAX_OUTPUT_TOKENS:-1000}
+  OpenAI__NetworkTimeoutSeconds: ${OPENAI_NETWORK_TIMEOUT_SECONDS:-30}
 
 services:
   database:
