@@ -1,3 +1,4 @@
+using PulsePilot.Application.Prioritization;
 using PulsePilot.Domain.Feedback;
 
 namespace PulsePilot.Application.Abstractions.Persistence;
@@ -31,6 +32,13 @@ public interface IFeedbackClusterRepository
         Guid clusterId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PriorityScoringMember>> ListPriorityScoringMembersAsync(
+        Guid workspaceId,
+        Guid clusterId,
+        IReadOnlyCollection<Guid> additionalFeedbackIds,
+        IReadOnlyCollection<Guid> excludedFeedbackIds,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(
         FeedbackCluster cluster,
         CancellationToken cancellationToken = default);
@@ -41,6 +49,8 @@ public sealed record FeedbackClusterSummaryData(
     string Title,
     FeedbackCategory Category,
     FeedbackComponent Component,
+    decimal PriorityScore,
+    FeedbackPriority Priority,
     int FeedbackCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

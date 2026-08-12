@@ -158,12 +158,17 @@ public sealed class AppDbContextModelTests
         var clusterEntity = dbContext.Model.FindEntityType(typeof(FeedbackCluster));
         var category = clusterEntity?.FindProperty(nameof(FeedbackCluster.Category));
         var component = clusterEntity?.FindProperty(nameof(FeedbackCluster.Component));
+        var priorityScore = clusterEntity?.FindProperty(nameof(FeedbackCluster.PriorityScore));
+        var priority = clusterEntity?.FindProperty(nameof(FeedbackCluster.Priority));
         var alternateKey = Assert.Single(
             clusterEntity!.GetKeys(),
             key => !key.IsPrimaryKey());
 
         Assert.Equal(typeof(string), category!.GetTypeMapping().Converter?.ProviderClrType);
         Assert.Equal(typeof(string), component!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal(5, priorityScore!.GetPrecision());
+        Assert.Equal(2, priorityScore.GetScale());
+        Assert.Equal(typeof(string), priority!.GetTypeMapping().Converter?.ProviderClrType);
         Assert.Equal(
             [nameof(FeedbackCluster.WorkspaceId), nameof(FeedbackCluster.Id)],
             alternateKey.Properties.Select(property => property.Name));

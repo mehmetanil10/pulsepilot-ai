@@ -3,6 +3,7 @@ using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
+using PulsePilot.Application.Prioritization;
 using PulsePilot.Domain.Feedback;
 
 using FeedbackEntity = PulsePilot.Domain.Feedback.Feedback;
@@ -13,6 +14,9 @@ internal sealed class FeedbackService(
     IFeedbackRepository feedbackRepository,
     IFeedbackAnalysisRepository feedbackAnalysisRepository,
     IFeedbackEmbeddingRepository feedbackEmbeddingRepository,
+    IFeedbackClusterRepository feedbackClusterRepository,
+    IFeedbackClusterAssignmentLock clusterAssignmentLock,
+    IPriorityScoreCalculator priorityScoreCalculator,
     IUnitOfWork unitOfWork,
     ICurrentUserContext currentUser,
     TimeProvider timeProvider,
@@ -174,26 +178,92 @@ internal sealed class FeedbackService(
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var feedback = await GetRequiredFeedbackAsync(feedbackId, cancellationToken);
-        feedback.UpdateDetails(
-            command.Title,
-            command.Content,
-            command.Source,
-            command.CustomerName,
-            command.CustomerEmail,
-            timeProvider.GetUtcNow());
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return await clusterAssignmentLock.ExecuteAsync(
+            currentUser.WorkspaceId,
+            async token =>
+            {
+                var feedback = await GetRequiredFeedbackAsync(feedbackId, token);
+                var previousClusterId = feedback.FeedbackClusterId;
+                var updatedAt = timeProvider.GetUtcNow();
+                feedback.UpdateDetails(
+                    command.Title,
+                    command.Content,
+                    command.Source,
+                    command.CustomerName,
+                    command.CustomerEmail,
+                    updatedAt);
+                await RecalculateClusterAfterRemovalAsync(
+                    previousClusterId,
+                    feedback.Id,
+                    updatedAt,
+                    token);
+                await unitOfWork.SaveChangesAsync(token);
 
-        return FeedbackResponse.FromEntity(feedback);
+                return FeedbackResponse.FromEntity(feedback);
+            },
+            cancellationToken);
     }
 
     public async Task DeleteAsync(
         Guid feedbackId,
         CancellationToken cancellationToken = default)
     {
-        var feedback = await GetRequiredFeedbackAsync(feedbackId, cancellationToken);
-        feedback.MarkDeleted(timeProvider.GetUtcNow());
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await clusterAssignmentLock.ExecuteAsync(
+            currentUser.WorkspaceId,
+            async token =>
+            {
+                var feedback = await GetRequiredFeedbackAsync(feedbackId, token);
+                var previousClusterId = feedback.FeedbackClusterId;
+                var deletedAt = timeProvider.GetUtcNow();
+                feedback.MarkDeleted(deletedAt);
+                await RecalculateClusterAfterRemovalAsync(
+                    previousClusterId,
+                    feedback.Id,
+                    deletedAt,
+                    token);
+                await unitOfWork.SaveChangesAsync(token);
+
+                return true;
+            },
+            cancellationToken);
+    }
+
+    private async Task RecalculateClusterAfterRemovalAsync(
+        Guid? clusterId,
+        Guid removedFeedbackId,
+        DateTimeOffset calculatedAt,
+        CancellationToken cancellationToken)
+    {
+        if (!clusterId.HasValue)
+        {
+            return;
+        }
+
+        var cluster = await feedbackClusterRepository.GetByIdAsync(
+            currentUser.WorkspaceId,
+            clusterId.Value,
+            cancellationToken);
+
+        if (cluster is null)
+        {
+            return;
+        }
+
+        var members = await feedbackClusterRepository.ListPriorityScoringMembersAsync(
+            currentUser.WorkspaceId,
+            clusterId.Value,
+            [],
+            [removedFeedbackId],
+            cancellationToken);
+
+        if (members.Count == 0)
+        {
+            cluster.UpdatePriority(0m, FeedbackPriority.P4, calculatedAt);
+            return;
+        }
+
+        var priority = priorityScoreCalculator.Calculate(members, calculatedAt);
+        cluster.UpdatePriority(priority.Score, priority.Priority, calculatedAt);
     }
 
     private async Task<FeedbackEntity> GetRequiredFeedbackAsync(

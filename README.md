@@ -188,6 +188,26 @@ preventing duplicate clusters when worker replicas finish similar feedback at
 the same time; provider calls remain outside the lock. Updating feedback clears
 its stale cluster membership until reprocessing completes.
 
+Cluster priority is deterministic and does not delegate business-critical
+ranking to the LLM. The worker normalizes four factors to `0–1`, applies
+configurable weights, and persists a `0–100` score plus a `P1`–`P4` level in the
+same locked save as cluster assignment:
+
+```text
+score = 100 × (severity × 0.35 + frequency × 0.30
+             + customerImpact × 0.20 + recency × 0.15)
+```
+
+Severity uses the highest current member severity. Frequency saturates at 20
+active reports, customer impact counts distinct email/name identities and
+saturates at 10, and recency is the share of reports created within the last 7
+days. Anonymous reports receive distinct identities. Default thresholds are
+`P1 >= 75`, `P2 >= 50`, `P3 >= 25`, otherwise `P4`. Weights, normalization
+counts, the recency window, and thresholds are configurable through the
+`PriorityScoring` section and corresponding `PRIORITY_*` Compose variables.
+Cluster list results are ordered by priority score before feedback count and
+activity; both cluster endpoints return `priorityScore` and `priority`.
+
 The Infrastructure adapter uses the official OpenAI .NET SDK and Responses API.
 It requests a strict JSON Schema result, then deserializes and validates the
 result again before returning it to the application. Provider refusal,

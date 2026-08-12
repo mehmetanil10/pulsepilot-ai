@@ -50,6 +50,7 @@ public sealed class FeedbackClusterRepositoryTests(PostgreSqlFixture database)
         deletedFeedback.AssignToCluster(cluster.Id, now.AddMinutes(1));
         deletedFeedback.MarkDeleted(now.AddMinutes(2));
         cluster.RecordActivity(now.AddMinutes(1));
+        cluster.UpdatePriority(68.25m, FeedbackPriority.P2, now.AddMinutes(1));
 
         await using (var serviceProvider = database.CreateServiceProvider())
         await using (var scope = serviceProvider.CreateAsyncScope())
@@ -93,6 +94,8 @@ public sealed class FeedbackClusterRepositoryTests(PostgreSqlFixture database)
 
             var summary = Assert.Single(summaries);
             Assert.Equal(cluster.Id, summary.Id);
+            Assert.Equal(68.25m, summary.PriorityScore);
+            Assert.Equal(FeedbackPriority.P2, summary.Priority);
             Assert.Equal(1, summary.FeedbackCount);
             Assert.Equal(1, totalCount);
             Assert.Equal(1, memberCount);

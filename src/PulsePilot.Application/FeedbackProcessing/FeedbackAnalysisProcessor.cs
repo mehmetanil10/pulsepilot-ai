@@ -4,6 +4,7 @@ using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
 using PulsePilot.Application.Feedback;
+using PulsePilot.Application.Prioritization;
 using PulsePilot.Domain.Feedback;
 
 namespace PulsePilot.Application.FeedbackProcessing;
@@ -15,6 +16,7 @@ internal sealed class FeedbackAnalysisProcessor(
     IFeedbackEmbeddingRepository embeddingRepository,
     IFeedbackClusterRepository clusterRepository,
     IFeedbackClusterAssignmentLock clusterAssignmentLock,
+    IPriorityScoreCalculator priorityScoreCalculator,
     ILLMClient llmClient,
     IUnitOfWork unitOfWork,
     IOptions<FeedbackProcessingOptions> options,
@@ -329,7 +331,32 @@ internal sealed class FeedbackAnalysisProcessor(
             unassignedMatch.AssignToCluster(cluster.Id, assignedAt);
         }
 
+        var additionalFeedbackIds = unassignedMatches
+            .Select(match => match.Id)
+            .Append(feedback.Id)
+            .ToHashSet();
+        var priorityMembers = await clusterRepository.ListPriorityScoringMembersAsync(
+            item.WorkspaceId,
+            cluster.Id,
+            additionalFeedbackIds,
+            [],
+            cancellationToken);
+        var currentPriorityMember = new PriorityScoringMember(
+            feedback.Id,
+            feedback.CustomerName,
+            feedback.CustomerEmail,
+            feedback.CreatedAt,
+            analysisResult.Severity);
+        var currentMembers = priorityMembers
+            .Where(member => member.FeedbackId != feedback.Id)
+            .Append(currentPriorityMember)
+            .GroupBy(member => member.FeedbackId)
+            .Select(group => group.First())
+            .ToList();
+        var priority = priorityScoreCalculator.Calculate(currentMembers, assignedAt);
+
         cluster.RecordActivity(assignedAt);
+        cluster.UpdatePriority(priority.Score, priority.Priority, assignedAt);
     }
 
     private static string CreateClusterTitle(string? feedbackTitle, string analysisSummary)

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Application.Prioritization;
 using PulsePilot.Domain.Feedback;
 
 namespace PulsePilot.Infrastructure.Persistence.Repositories;
@@ -38,7 +39,9 @@ internal sealed class FeedbackClusterRepository(AppDbContext dbContext)
                     feedback.WorkspaceId == workspaceId
                     && feedback.FeedbackClusterId == cluster.Id),
             })
-            .OrderByDescending(result => result.FeedbackCount)
+            .OrderByDescending(result => result.Cluster.PriorityScore)
+            .ThenBy(result => result.Cluster.Priority)
+            .ThenByDescending(result => result.FeedbackCount)
             .ThenByDescending(result => result.Cluster.UpdatedAt)
             .ThenByDescending(result => result.Cluster.Id)
             .Skip(skip)
@@ -48,6 +51,8 @@ internal sealed class FeedbackClusterRepository(AppDbContext dbContext)
                 result.Cluster.Title,
                 result.Cluster.Category,
                 result.Cluster.Component,
+                result.Cluster.PriorityScore,
+                result.Cluster.Priority,
                 result.FeedbackCount,
                 result.Cluster.CreatedAt,
                 result.Cluster.UpdatedAt))
@@ -103,6 +108,39 @@ internal sealed class FeedbackClusterRepository(AppDbContext dbContext)
             feedback => feedback.WorkspaceId == workspaceId
                 && feedback.FeedbackClusterId == clusterId,
             cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<PriorityScoringMember>> ListPriorityScoringMembersAsync(
+        Guid workspaceId,
+        Guid clusterId,
+        IReadOnlyCollection<Guid> additionalFeedbackIds,
+        IReadOnlyCollection<Guid> excludedFeedbackIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(additionalFeedbackIds);
+        ArgumentNullException.ThrowIfNull(excludedFeedbackIds);
+
+        var additionalIds = additionalFeedbackIds.ToArray();
+        var excludedIds = excludedFeedbackIds.ToArray();
+
+        return await (
+            from feedback in dbContext.Feedback.AsNoTracking()
+            join analysis in dbContext.FeedbackAnalyses.AsNoTracking()
+                on new { feedback.WorkspaceId, FeedbackId = feedback.Id }
+                equals new { analysis.WorkspaceId, analysis.FeedbackId }
+                into feedbackAnalyses
+            from analysis in feedbackAnalyses.DefaultIfEmpty()
+            where feedback.WorkspaceId == workspaceId
+                && (feedback.FeedbackClusterId == clusterId
+                    || additionalIds.Contains(feedback.Id))
+                && !excludedIds.Contains(feedback.Id)
+            select new PriorityScoringMember(
+                feedback.Id,
+                feedback.CustomerName,
+                feedback.CustomerEmail,
+                feedback.CreatedAt,
+                analysis == null ? null : analysis.Severity))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task AddAsync(

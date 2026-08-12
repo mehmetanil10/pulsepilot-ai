@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Authentication;
+using PulsePilot.Application.Feedback;
 using PulsePilot.Application.FeedbackClusters;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.IntegrationTests.Persistence;
@@ -44,6 +45,7 @@ public sealed class FeedbackClusterEndpointTests(PostgreSqlFixture database)
             DateTimeOffset.UtcNow.AddSeconds(1));
         firstFeedback.AssignToCluster(cluster.Id, DateTimeOffset.UtcNow.AddMinutes(1));
         secondFeedback.AssignToCluster(cluster.Id, DateTimeOffset.UtcNow.AddMinutes(1));
+        cluster.UpdatePriority(82.5m, FeedbackPriority.P1, DateTimeOffset.UtcNow.AddMinutes(1));
 
         await using (var scope = factory.Services.CreateAsyncScope())
         {
@@ -77,10 +79,14 @@ public sealed class FeedbackClusterEndpointTests(PostgreSqlFixture database)
         Assert.Equal(2, summary.FeedbackCount);
         Assert.Equal(FeedbackCategory.Bug, summary.Category);
         Assert.Equal(FeedbackComponent.Payments, summary.Component);
+        Assert.Equal(82.5m, summary.PriorityScore);
+        Assert.Equal(FeedbackPriority.P1, summary.Priority);
 
         Assert.NotNull(detail);
         Assert.Equal(cluster.Id, detail.Id);
         Assert.Equal(2, detail.TotalFeedbackCount);
+        Assert.Equal(82.5m, detail.PriorityScore);
+        Assert.Equal(FeedbackPriority.P1, detail.Priority);
         Assert.Single(detail.Feedback);
         Assert.Equal(1, detail.Page);
         Assert.Equal(1, detail.PageSize);
@@ -91,6 +97,85 @@ public sealed class FeedbackClusterEndpointTests(PostgreSqlFixture database)
         Assert.Equal(HttpStatusCode.NotFound, outsiderDetail.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, invalidPageResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task FeedbackMutation_RecalculatesPreviousClusterPriority()
+    {
+        await using var factory = new PulsePilotApiFactory(database.ConnectionString);
+        var owner = await CreateAuthenticatedClientAsync(factory, "priority-mutation-owner");
+        using var client = owner.Client;
+        var now = DateTimeOffset.UtcNow;
+        var cluster = FeedbackCluster.Create(
+            owner.Authentication.WorkspaceId,
+            "Payment failures",
+            FeedbackCategory.Bug,
+            FeedbackComponent.Payments,
+            now);
+        var criticalFeedback = CreateFeedback(
+            owner.Authentication,
+            "Critical card failure",
+            now);
+        var minorFeedback = CreateFeedback(
+            owner.Authentication,
+            "Minor card warning",
+            now);
+        criticalFeedback.AssignToCluster(cluster.Id, now);
+        minorFeedback.AssignToCluster(cluster.Id, now);
+        cluster.UpdatePriority(100m, FeedbackPriority.P1, now);
+        var criticalAnalysis = CreateAnalysis(criticalFeedback, severity: 5, now);
+        var minorAnalysis = CreateAnalysis(minorFeedback, severity: 1, now);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider
+                .GetRequiredService<IFeedbackClusterRepository>()
+                .AddAsync(cluster);
+            var feedbackRepository = scope.ServiceProvider.GetRequiredService<IFeedbackRepository>();
+            await feedbackRepository.AddAsync(criticalFeedback);
+            await feedbackRepository.AddAsync(minorFeedback);
+            var analysisRepository = scope.ServiceProvider
+                .GetRequiredService<IFeedbackAnalysisRepository>();
+            await analysisRepository.AddAsync(criticalAnalysis);
+            await analysisRepository.AddAsync(minorAnalysis);
+            await scope.ServiceProvider.GetRequiredService<IUnitOfWork>().SaveChangesAsync();
+        }
+
+        using var updateResponse = await client.PutAsJsonAsync(
+            $"/api/feedback/{criticalFeedback.Id}",
+            new UpdateFeedbackCommand(
+                "Updated critical report",
+                "Updated critical report content",
+                FeedbackSource.Manual,
+                null,
+                null),
+            SerializerOptions);
+        updateResponse.EnsureSuccessStatusCode();
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var updatedCluster = await scope.ServiceProvider
+                .GetRequiredService<IFeedbackClusterRepository>()
+                .GetByIdAsync(owner.Authentication.WorkspaceId, cluster.Id);
+
+            Assert.NotNull(updatedCluster);
+            Assert.Equal(25.50m, updatedCluster.PriorityScore);
+            Assert.Equal(FeedbackPriority.P3, updatedCluster.Priority);
+        }
+
+        using var deleteResponse = await client.DeleteAsync($"/api/feedback/{minorFeedback.Id}");
+        Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var emptyCluster = await scope.ServiceProvider
+                .GetRequiredService<IFeedbackClusterRepository>()
+                .GetByIdAsync(owner.Authentication.WorkspaceId, cluster.Id);
+
+            Assert.NotNull(emptyCluster);
+            Assert.Equal(0m, emptyCluster.PriorityScore);
+            Assert.Equal(FeedbackPriority.P4, emptyCluster.Priority);
+        }
     }
 
     private static async Task<AuthenticatedClient> CreateAuthenticatedClientAsync(
@@ -132,6 +217,24 @@ public sealed class FeedbackClusterEndpointTests(PostgreSqlFixture database)
             null,
             null,
             createdAt);
+    }
+
+    private static FeedbackAnalysis CreateAnalysis(
+        FeedbackEntity feedback,
+        int severity,
+        DateTimeOffset analyzedAt)
+    {
+        return FeedbackAnalysis.Create(
+            feedback.WorkspaceId,
+            feedback.Id,
+            FeedbackCategory.Bug,
+            FeedbackComponent.Payments,
+            severity,
+            FeedbackSentiment.Negative,
+            "Payment feedback summary.",
+            "Investigate the payment flow.",
+            0.95m,
+            analyzedAt);
     }
 
     private static JsonSerializerOptions CreateSerializerOptions()

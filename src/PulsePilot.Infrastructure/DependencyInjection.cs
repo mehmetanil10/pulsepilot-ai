@@ -14,6 +14,7 @@ using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Feedback;
+using PulsePilot.Application.Prioritization;
 using PulsePilot.Infrastructure.AI;
 using PulsePilot.Infrastructure.Authentication;
 using PulsePilot.Infrastructure.Persistence;
@@ -78,6 +79,38 @@ public static class DependencyInjection
             .Validate(
                 options => options.DefaultLimit <= options.MaxLimit,
                 "Semantic search default limit cannot exceed its maximum limit.")
+            .ValidateOnStart();
+
+        services.AddOptions<PriorityScoringOptions>()
+            .Bind(configuration.GetSection(PriorityScoringOptions.SectionName))
+            .Validate(
+                options => options.SeverityWeight is >= 0 and <= 1
+                    && options.FrequencyWeight is >= 0 and <= 1
+                    && options.CustomerImpactWeight is >= 0 and <= 1
+                    && options.RecencyWeight is >= 0 and <= 1,
+                "Priority scoring weights must each be between 0 and 1.")
+            .Validate(
+                options => options.SeverityWeight
+                    + options.FrequencyWeight
+                    + options.CustomerImpactWeight
+                    + options.RecencyWeight == 1m,
+                "Priority scoring weights must total 1.")
+            .Validate(
+                options => options.FrequencyNormalizationCount is >= 1 and <= 100_000,
+                "Priority frequency normalization count must be between 1 and 100000.")
+            .Validate(
+                options => options.CustomerImpactNormalizationCount is >= 1 and <= 100_000,
+                "Priority customer impact normalization count must be between 1 and 100000.")
+            .Validate(
+                options => options.RecencyWindowDays is >= 1 and <= 365,
+                "Priority recency window must be between 1 and 365 days.")
+            .Validate(
+                options => options.P1Threshold is > 0 and <= 100
+                    && options.P2Threshold is > 0
+                    && options.P3Threshold is >= 0
+                    && options.P1Threshold > options.P2Threshold
+                    && options.P2Threshold > options.P3Threshold,
+                "Priority thresholds must be ordered P1 > P2 > P3 within 0 to 100.")
             .ValidateOnStart();
 
         services.AddOptions<OpenAIOptions>()

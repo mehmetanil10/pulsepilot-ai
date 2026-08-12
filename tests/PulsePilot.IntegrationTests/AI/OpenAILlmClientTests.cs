@@ -15,6 +15,7 @@ using OpenAI.Responses;
 using PulsePilot.Application;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
+using PulsePilot.Application.Prioritization;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Infrastructure;
 using PulsePilot.Infrastructure.AI;
@@ -295,6 +296,26 @@ public sealed class OpenAILlmClientTests
 
         Assert.Throws<OptionsValidationException>(() =>
             serviceProvider.GetRequiredService<IOptions<OpenAIOptions>>().Value);
+    }
+
+    [Fact]
+    public void PriorityScoringOptions_RequireWeightsToTotalOne()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Database"] =
+                    "Host=localhost;Database=pulsepilot;Username=pulsepilot",
+                ["PriorityScoring:SeverityWeight"] = "0.40",
+            })
+            .Build();
+        using var serviceProvider = new ServiceCollection()
+            .AddApplication()
+            .AddInfrastructure(configuration)
+            .BuildServiceProvider();
+
+        Assert.Throws<OptionsValidationException>(() =>
+            serviceProvider.GetRequiredService<IOptions<PriorityScoringOptions>>().Value);
     }
 
     private static OpenAILlmClient CreateClient(

@@ -346,6 +346,10 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
         Assert.Single(await dbContext.FeedbackClusters
             .Where(cluster => cluster.WorkspaceId == firstFeedback.WorkspaceId)
             .ToListAsync());
+        var cluster = await dbContext.FeedbackClusters
+            .SingleAsync(entity => entity.WorkspaceId == firstFeedback.WorkspaceId);
+        Assert.Equal(50m, cluster.PriorityScore);
+        Assert.Equal(FeedbackPriority.P2, cluster.Priority);
     }
 
     [Fact]

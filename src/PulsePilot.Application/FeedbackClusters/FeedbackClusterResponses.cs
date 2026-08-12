@@ -14,6 +14,8 @@ public sealed record FeedbackClusterSummaryResponse(
     string Title,
     FeedbackCategory Category,
     FeedbackComponent Component,
+    decimal PriorityScore,
+    FeedbackPriority Priority,
     int FeedbackCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt)
@@ -26,6 +28,8 @@ public sealed record FeedbackClusterSummaryResponse(
             cluster.Title,
             cluster.Category,
             cluster.Component,
+            cluster.PriorityScore,
+            cluster.Priority,
             cluster.FeedbackCount,
             cluster.CreatedAt,
             cluster.UpdatedAt);
@@ -37,6 +41,8 @@ public sealed record FeedbackClusterDetailResponse(
     string Title,
     FeedbackCategory Category,
     FeedbackComponent Component,
+    decimal PriorityScore,
+    FeedbackPriority Priority,
     IReadOnlyList<FeedbackClusterMemberResponse> Feedback,
     int Page,
     int PageSize,

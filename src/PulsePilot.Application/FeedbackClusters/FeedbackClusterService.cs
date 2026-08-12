@@ -65,6 +65,8 @@ internal sealed class FeedbackClusterService(
             cluster.Title,
             cluster.Category,
             cluster.Component,
+            cluster.PriorityScore,
+            cluster.Priority,
             feedback.Select(FeedbackClusterMemberResponse.FromData).ToList(),
             query.Page,
             query.PageSize,
