@@ -6,7 +6,7 @@ issues, and keep critical actions behind human approval.
 
 ## Current status
 
-Sprint 1 is complete and Sprint 2 is in progress. The .NET 10 Clean Architecture
+Sprint 1 and Sprint 2 are complete. The .NET 10 Clean Architecture
 foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, and idempotent demo seed are ready. The AI intelligence foundation now
@@ -282,3 +282,23 @@ PostgreSQL persistence, validation and Problem Details responses, seed
 idempotency, and demo-account login. The Docker smoke flow verifies migration,
 optional seeding, API readiness, and authenticated feedback access against the
 Compose stack.
+
+## Sprint 2 acceptance
+
+Sprint 2 is complete against its Definition of Done:
+
+- New feedback is persisted as `Pending` and claimed by the background worker.
+- Provider-independent structured analysis is validated and persisted.
+- A 1,536-dimensional embedding is generated and stored in PostgreSQL/pgvector.
+- Workspace-scoped semantic search returns related completed feedback.
+- Similar category/component feedback joins a concurrency-safe cluster.
+- Deterministic priority scoring persists a `0–100` score and `P1`–`P4` level.
+- Transient provider failures and timeouts use bounded retries; permanent failures
+  move feedback to `Failed` without partial analysis or embedding data.
+- Failed records can be explicitly queued for retry through the API.
+
+The Sprint 2 acceptance test exercises the complete API-to-worker-to-API flow
+with a deterministic in-process provider: registration, feedback creation,
+analysis, embedding, semantic similarity, clustering, priority calculation,
+persistence, and workspace isolation. It performs no external AI calls. The
+remaining provider-contract tests use a local HTTP stub.
