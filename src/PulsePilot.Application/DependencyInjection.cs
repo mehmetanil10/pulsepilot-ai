@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PulsePilot.Application.Actions;
 using PulsePilot.Application.Authentication;
 using PulsePilot.Application.Feedback;
 using PulsePilot.Application.FeedbackClusters;
@@ -15,6 +16,8 @@ public static class DependencyInjection
     {
         services.AddValidatorsFromAssemblyContaining(typeof(DependencyInjection));
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IPendingActionService, PendingActionService>();
+        services.AddScoped<IPendingActionRecommender, PendingActionRecommender>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IFeedbackClusterService, FeedbackClusterService>();
         services.AddScoped<IFeedbackAnalysisProcessor, FeedbackAnalysisProcessor>();

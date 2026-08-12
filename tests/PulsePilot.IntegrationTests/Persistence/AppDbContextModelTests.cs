@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
+using PulsePilot.Domain.Actions;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
@@ -31,6 +32,9 @@ public sealed class AppDbContextModelTests
         Assert.Equal(
             "feedback_clusters",
             dbContext.Model.FindEntityType(typeof(FeedbackCluster))?.GetTableName());
+        Assert.Equal(
+            "pending_actions",
+            dbContext.Model.FindEntityType(typeof(PendingAction))?.GetTableName());
     }
 
     [Fact]
@@ -172,6 +176,36 @@ public sealed class AppDbContextModelTests
         Assert.Equal(
             [nameof(FeedbackCluster.WorkspaceId), nameof(FeedbackCluster.Id)],
             alternateKey.Properties.Select(property => property.Name));
+    }
+
+    [Fact]
+    public void PendingAction_UsesJsonPayloadStringEnumsAndActiveRecommendationConstraint()
+    {
+        using var dbContext = CreateDbContext();
+        var actionEntity = dbContext.Model.FindEntityType(typeof(PendingAction));
+        var actionType = actionEntity?.FindProperty(nameof(PendingAction.ActionType));
+        var status = actionEntity?.FindProperty(nameof(PendingAction.Status));
+        var payload = actionEntity?.FindProperty(nameof(PendingAction.Payload));
+        var activeIndex = Assert.Single(
+            actionEntity!.GetIndexes(),
+            index => index.GetDatabaseName()
+                == "ux_pending_actions_active_cluster_action_type");
+
+        Assert.Equal(typeof(string), actionType!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal(typeof(string), status!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal("jsonb", payload!.GetColumnType());
+        Assert.True(activeIndex.IsUnique);
+        Assert.Equal(
+            [
+                nameof(PendingAction.WorkspaceId),
+                nameof(PendingAction.FeedbackClusterId),
+                nameof(PendingAction.ActionType),
+            ],
+            activeIndex.Properties.Select(property => property.Name));
+        Assert.Equal("status IN ('Pending', 'Approved')", activeIndex.GetFilter());
+        Assert.All(
+            actionEntity.GetForeignKeys(),
+            foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
     }
 
     private static AppDbContext CreateDbContext()

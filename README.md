@@ -6,7 +6,7 @@ issues, and keep critical actions behind human approval.
 
 ## Current status
 
-Sprint 1 and Sprint 2 are complete. The .NET 10 Clean Architecture
+Sprint 1 and Sprint 2 are complete, and Sprint 3 is in progress. The .NET 10 Clean Architecture
 foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, and idempotent demo seed are ready. The AI intelligence foundation now
@@ -17,7 +17,9 @@ worker now claims pending feedback with expiring leases, retries transient
 failures, and atomically persists analysis plus embedding without holding a
 transaction during either AI call. Cosine similarity search is workspace-scoped,
 and category/component-aware cluster assignment groups related reports safely
-across concurrent worker replicas. EF Core migrations and
+across concurrent worker replicas. High-priority clusters now produce durable,
+human-reviewable `PendingAction` recommendations without executing side effects.
+EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
 
@@ -160,6 +162,25 @@ validated JWT claims:
 List results are ordered by active feedback count and recent cluster activity.
 Cluster detail returns paginated, non-deleted feedback members. Cross-workspace
 cluster identifiers return `404`.
+
+## Pending Action API
+
+Pending-action endpoints require a bearer token and are always workspace-scoped:
+
+- `GET /api/actions?page=1&pageSize=20&status=pending`
+- `GET /api/actions/{id}`
+
+The worker deterministically recommends an action only for `P1` and `P2`
+clusters. Bugs and feature requests create an engineering-issue recommendation,
+`P1` complaints are escalated, and eligible complaints or questions create a
+customer-response draft recommendation. Lower-priority and informational
+clusters produce no action. The LLM's suggested action is retained only as
+payload context and cannot select or execute a tool.
+
+Recommendations are persisted with `Pending` status. A filtered PostgreSQL
+unique index permits only one active (`Pending` or `Approved`) recommendation
+for the same workspace, cluster, and action type. Approval, rejection, and tool
+execution are intentionally deferred to the subsequent human-in-the-loop tasks.
 
 ## AI intelligence foundation
 

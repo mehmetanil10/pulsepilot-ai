@@ -7,6 +7,7 @@ using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
 using PulsePilot.Application.FeedbackProcessing;
+using PulsePilot.Domain.Actions;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
@@ -350,6 +351,11 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
             .SingleAsync(entity => entity.WorkspaceId == firstFeedback.WorkspaceId);
         Assert.Equal(50m, cluster.PriorityScore);
         Assert.Equal(FeedbackPriority.P2, cluster.Priority);
+        var pendingAction = await dbContext.PendingActions
+            .SingleAsync(action => action.WorkspaceId == firstFeedback.WorkspaceId);
+        Assert.Equal(cluster.Id, pendingAction.FeedbackClusterId);
+        Assert.Equal(PendingActionType.CreateEngineeringIssue, pendingAction.ActionType);
+        Assert.Equal(PendingActionStatus.Pending, pendingAction.Status);
     }
 
     [Fact]

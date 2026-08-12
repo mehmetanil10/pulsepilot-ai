@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Domain.Actions;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
@@ -28,6 +29,8 @@ public sealed class AppDbContext : DbContext, IUnitOfWork
     public DbSet<FeedbackEmbedding> FeedbackEmbeddings => Set<FeedbackEmbedding>();
 
     public DbSet<FeedbackCluster> FeedbackClusters => Set<FeedbackCluster>();
+
+    public DbSet<PendingAction> PendingActions => Set<PendingAction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

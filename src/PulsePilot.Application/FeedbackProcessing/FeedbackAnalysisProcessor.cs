@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Application.Actions;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
 using PulsePilot.Application.Feedback;
@@ -17,6 +18,7 @@ internal sealed class FeedbackAnalysisProcessor(
     IFeedbackClusterRepository clusterRepository,
     IFeedbackClusterAssignmentLock clusterAssignmentLock,
     IPriorityScoreCalculator priorityScoreCalculator,
+    IPendingActionRecommender pendingActionRecommender,
     ILLMClient llmClient,
     IUnitOfWork unitOfWork,
     IOptions<FeedbackProcessingOptions> options,
@@ -357,6 +359,14 @@ internal sealed class FeedbackAnalysisProcessor(
 
         cluster.RecordActivity(assignedAt);
         cluster.UpdatePriority(priority.Score, priority.Priority, assignedAt);
+        await pendingActionRecommender.RecommendAsync(
+            new ActionRecommendationContext(
+                feedback,
+                cluster,
+                analysisResult,
+                currentMembers.Count,
+                assignedAt),
+            cancellationToken);
     }
 
     private static string CreateClusterTitle(string? feedbackTitle, string analysisSummary)
