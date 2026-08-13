@@ -7,7 +7,7 @@ import { Icon } from "@/components/icons";
 
 const items = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" as const, ready: true },
-  { label: "Feedback", href: "/feedback", icon: "feedback" as const, ready: false },
+  { label: "Feedback", href: "/feedback", icon: "feedback" as const, ready: true },
   { label: "Actions", href: "/actions", icon: "actions" as const, ready: false },
   { label: "Backlog", href: "/backlog", icon: "backlog" as const, ready: false },
   { label: "Copilot", href: "/copilot", icon: "copilot" as const, ready: false },

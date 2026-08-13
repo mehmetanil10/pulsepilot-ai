@@ -130,6 +130,11 @@ count, recent feedback metadata, pending-action previews, and category totals.
 The frontend validates both API response shapes before rendering and supports
 7, 30, and 90-day views without exposing the access token to browser code.
 
+`GET /api/feedback` also powers the live feedback library. Its workspace-scoped
+query supports source, processing status, category, component, severity,
+sentiment, inclusive date ranges, title/content search, and pagination. List
+responses include a compact AI-analysis projection without customer PII.
+
 ## Demo seed data
 
 Demo data is disabled by default. To create a demo owner, workspace, and at least

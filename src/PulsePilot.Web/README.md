@@ -23,6 +23,10 @@ The dashboard reads `/api/dashboard/summary` and `/api/dashboard/trending`
 directly from the API in a server component. Its 7, 30, and 90-day views are
 always uncached so workspace metrics reflect the current backend state.
 
+The feedback library uses the same server-only session path. It supports
+workspace-scoped search, source, processing status, AI category, component,
+severity, sentiment, date filters, and paginated links to feedback detail.
+
 ## Checks
 
 ```powershell

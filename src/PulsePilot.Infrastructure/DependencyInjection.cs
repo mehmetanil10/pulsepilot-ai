@@ -333,6 +333,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
         services.AddScoped<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
+        services.AddScoped<IFeedbackListRepository, FeedbackListRepository>();
         services.AddScoped<IFeedbackStatisticsRepository, FeedbackStatisticsRepository>();
         services.AddScoped<ITrendingIssueRepository, TrendingIssueRepository>();
         services.AddScoped<IFeedbackAnalysisRepository, FeedbackAnalysisRepository>();

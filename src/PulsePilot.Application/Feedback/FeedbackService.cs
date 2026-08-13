@@ -11,6 +11,7 @@ namespace PulsePilot.Application.Feedback;
 
 internal sealed class FeedbackService(
     IFeedbackRepository feedbackRepository,
+    IFeedbackListRepository feedbackListRepository,
     IFeedbackAnalysisRepository feedbackAnalysisRepository,
     IFeedbackClusterRepository feedbackClusterRepository,
     IFeedbackClusterAssignmentLock clusterAssignmentLock,
@@ -50,24 +51,47 @@ internal sealed class FeedbackService(
 
         var workspaceId = currentUser.WorkspaceId;
         var skip = (int)((long)(query.Page - 1) * query.PageSize);
-        var totalCount = await feedbackRepository.CountAsync(
+        DateTimeOffset? dateFrom = query.DateFrom.HasValue
+            ? new DateTimeOffset(
+                query.DateFrom.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
+            : null;
+        DateTimeOffset? dateTo = query.DateTo.HasValue
+            ? new DateTimeOffset(
+                query.DateTo.Value.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc))
+            : null;
+        var page = await feedbackListRepository.GetPageAsync(
             workspaceId,
-            query.Source,
-            query.ProcessingStatus,
-            cancellationToken);
-        var feedback = await feedbackRepository.ListAsync(
-            workspaceId,
+            new FeedbackListFilter(
+                query.Source,
+                query.ProcessingStatus,
+                query.Category,
+                query.Component,
+                query.Severity,
+                query.Sentiment,
+                dateFrom,
+                dateTo,
+                query.Search),
             skip,
             query.PageSize,
-            query.Source,
-            query.ProcessingStatus,
             cancellationToken);
 
         return new FeedbackListResponse(
-            feedback.Select(FeedbackResponse.FromEntity).ToList(),
+            page.Items.Select(item => new FeedbackListItemResponse(
+                item.Id,
+                item.FeedbackClusterId,
+                item.Title,
+                item.Content,
+                item.Source,
+                item.ProcessingStatus,
+                item.CreatedAt,
+                item.UpdatedAt,
+                item.Category,
+                item.Component,
+                item.Severity,
+                item.Sentiment)).ToList(),
             query.Page,
             query.PageSize,
-            totalCount);
+            page.TotalCount);
     }
 
     public async Task<FeedbackResponse> GetByIdAsync(

@@ -73,4 +73,24 @@ public sealed class FeedbackValidatorTests
 
         Assert.False(result.IsValid);
     }
+
+    [Fact]
+    public async Task ListQuery_WithUnsupportedAnalysisAndDateFilters_IsRejected()
+    {
+        var query = new ListFeedbackQuery
+        {
+            Category = (FeedbackCategory)999,
+            Component = (FeedbackComponent)999,
+            Sentiment = (FeedbackSentiment)999,
+            Severity = 6,
+            DateFrom = new DateOnly(2026, 8, 13),
+            DateTo = new DateOnly(2026, 8, 1),
+            Search = new string('x', ListFeedbackQueryValidator.MaximumSearchLength + 1),
+        };
+
+        var result = await new ListFeedbackQueryValidator().ValidateAsync(query);
+
+        Assert.False(result.IsValid);
+        Assert.Equal(6, result.Errors.Count);
+    }
 }

@@ -157,9 +157,11 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
         await using var factory = new PulsePilotApiFactory(database.ConnectionString);
         using var client = await CreateAuthenticatedClientAsync(factory, "filters");
 
-        await CreateFeedbackAsync(client, "Manual one", FeedbackSource.Manual);
+        var analyzed = await CreateFeedbackAsync(client, "Manual one", FeedbackSource.Manual);
         await CreateFeedbackAsync(client, "Manual two", FeedbackSource.Manual);
         await CreateFeedbackAsync(client, "API one", FeedbackSource.Api);
+        await CompleteAnalysisAsync(factory, analyzed.Id);
+        var today = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd");
 
         var firstPage = await client.GetFromJsonAsync<FeedbackListResponse>(
             "/api/feedback?source=manual&page=1&pageSize=1",
@@ -169,6 +171,10 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
             SerializerOptions);
         var pending = await client.GetFromJsonAsync<FeedbackListResponse>(
             "/api/feedback?processingStatus=pending&pageSize=10",
+            SerializerOptions);
+        var analyzedFilter = await client.GetFromJsonAsync<FeedbackListResponse>(
+            $"/api/feedback?category=bug&component=payments&severity=4"
+            + $"&sentiment=negative&search=Manual%20one&dateFrom={today}&dateTo={today}",
             SerializerOptions);
 
         Assert.NotNull(firstPage);
@@ -182,10 +188,18 @@ public sealed class FeedbackEndpointTests(PostgreSqlFixture database)
         Assert.NotEqual(firstPage.Items[0].Id, secondPage.Items[0].Id);
 
         Assert.NotNull(pending);
-        Assert.Equal(3, pending.TotalCount);
+        Assert.Equal(2, pending.TotalCount);
         Assert.All(
             pending.Items,
             item => Assert.Equal(ProcessingStatus.Pending, item.ProcessingStatus));
+
+        Assert.NotNull(analyzedFilter);
+        var analyzedItem = Assert.Single(analyzedFilter.Items);
+        Assert.Equal(analyzed.Id, analyzedItem.Id);
+        Assert.Equal(FeedbackCategory.Bug, analyzedItem.Category);
+        Assert.Equal(FeedbackComponent.Payments, analyzedItem.Component);
+        Assert.Equal(4, analyzedItem.Severity);
+        Assert.Equal(FeedbackSentiment.Negative, analyzedItem.Sentiment);
     }
 
     [Fact]
