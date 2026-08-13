@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IPendingActionRecommender, PendingActionRecommender>();
         services.AddScoped<ICreateBacklogItemTool, CreateBacklogItemTool>();
         services.AddScoped<IGetFeedbackStatisticsTool, GetFeedbackStatisticsTool>();
+        services.AddScoped<IGetTrendingIssuesTool, GetTrendingIssuesTool>();
         services.AddScoped<ISearchSimilarFeedbackTool, SearchSimilarFeedbackTool>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IFeedbackClusterService, FeedbackClusterService>();
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddOptions<FeedbackProcessingOptions>();
         services.AddOptions<FeedbackStatisticsOptions>();
         services.AddOptions<SemanticSearchOptions>();
+        services.AddOptions<TrendingIssuesOptions>();
         services.AddOptions<PriorityScoringOptions>();
         services.TryAddSingleton(TimeProvider.System);
 

@@ -97,6 +97,32 @@ public static class DependencyInjection
                 "Feedback statistics default period cannot exceed its maximum period.")
             .ValidateOnStart();
 
+        services.AddOptions<TrendingIssuesOptions>()
+            .Bind(configuration.GetSection(TrendingIssuesOptions.SectionName))
+            .Validate(
+                options => options.DefaultPeriodDays is >= 1
+                    and <= TrendingIssuesOptions.MaximumAllowedPeriod,
+                $"Trending issues default period must be between 1 and {TrendingIssuesOptions.MaximumAllowedPeriod} days.")
+            .Validate(
+                options => options.MaxPeriodDays is >= 1
+                    and <= TrendingIssuesOptions.MaximumAllowedPeriod,
+                $"Trending issues maximum period must be between 1 and {TrendingIssuesOptions.MaximumAllowedPeriod} days.")
+            .Validate(
+                options => options.DefaultPeriodDays <= options.MaxPeriodDays,
+                "Trending issues default period cannot exceed its maximum period.")
+            .Validate(
+                options => options.DefaultLimit is >= 1
+                    and <= TrendingIssuesOptions.MaximumResultLimit,
+                $"Trending issues default limit must be between 1 and {TrendingIssuesOptions.MaximumResultLimit}.")
+            .Validate(
+                options => options.MaxLimit is >= 1
+                    and <= TrendingIssuesOptions.MaximumResultLimit,
+                $"Trending issues maximum limit must be between 1 and {TrendingIssuesOptions.MaximumResultLimit}.")
+            .Validate(
+                options => options.DefaultLimit <= options.MaxLimit,
+                "Trending issues default limit cannot exceed its maximum limit.")
+            .ValidateOnStart();
+
         services.AddOptions<PriorityScoringOptions>()
             .Bind(configuration.GetSection(PriorityScoringOptions.SectionName))
             .Validate(
@@ -211,6 +237,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
         services.AddScoped<IFeedbackStatisticsRepository, FeedbackStatisticsRepository>();
+        services.AddScoped<ITrendingIssueRepository, TrendingIssueRepository>();
         services.AddScoped<IFeedbackAnalysisRepository, FeedbackAnalysisRepository>();
         services.AddScoped<IFeedbackEmbeddingRepository, FeedbackEmbeddingRepository>();
         services.AddScoped<IFeedbackClusterRepository, FeedbackClusterRepository>();

@@ -227,6 +227,10 @@ similarity threshold, or embedding vector.
   processing-status, source, category, component, sentiment, and severity
   distributions. Statistics use feedback creation time and exclude soft-deleted
   or cross-workspace records.
+- `GetTrendingIssuesTool` compares the current lookback window with the equally
+  sized preceding window. It returns only clusters whose report volume grew,
+  ordered by absolute increase, with current/previous counts, delta, percentage
+  growth, priority, and an explicit marker for newly appearing issues.
 
 The existing `GET /api/feedback/{id}/similar` endpoint delegates to the same
 search tool, keeping API and future agent behavior consistent.

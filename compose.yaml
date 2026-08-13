@@ -32,6 +32,10 @@ x-api-environment: &api-environment
   SemanticSearch__MaxLimit: ${SIMILARITY_MAX_LIMIT:-50}
   FeedbackStatistics__DefaultPeriodDays: ${FEEDBACK_STATISTICS_DEFAULT_PERIOD_DAYS:-7}
   FeedbackStatistics__MaxPeriodDays: ${FEEDBACK_STATISTICS_MAX_PERIOD_DAYS:-365}
+  TrendingIssues__DefaultPeriodDays: ${TRENDING_ISSUES_DEFAULT_PERIOD_DAYS:-7}
+  TrendingIssues__MaxPeriodDays: ${TRENDING_ISSUES_MAX_PERIOD_DAYS:-365}
+  TrendingIssues__DefaultLimit: ${TRENDING_ISSUES_DEFAULT_LIMIT:-10}
+  TrendingIssues__MaxLimit: ${TRENDING_ISSUES_MAX_LIMIT:-50}
   PriorityScoring__SeverityWeight: ${PRIORITY_SEVERITY_WEIGHT:-0.35}
   PriorityScoring__FrequencyWeight: ${PRIORITY_FREQUENCY_WEIGHT:-0.30}
   PriorityScoring__CustomerImpactWeight: ${PRIORITY_CUSTOMER_IMPACT_WEIGHT:-0.20}
