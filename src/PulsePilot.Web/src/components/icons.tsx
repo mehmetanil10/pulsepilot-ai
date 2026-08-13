@@ -1,4 +1,4 @@
-type IconProps = { name: "dashboard" | "feedback" | "actions" | "backlog" | "copilot" | "spark" | "arrow" };
+type IconProps = { name: "dashboard" | "feedback" | "actions" | "backlog" | "copilot" | "spark" | "arrow" | "trend" | "alert" | "clock" };
 
 export function Icon({ name }: IconProps) {
   const paths = {
@@ -9,6 +9,9 @@ export function Icon({ name }: IconProps) {
     copilot: <><path d="M12 3 9.5 8.5 4 11l5.5 2.5L12 19l2.5-5.5L20 11l-5.5-2.5Z" /><path d="m19 3-.8 1.8L16.5 6l1.7.8L19 8.5l.8-1.7L21.5 6l-1.7-1.2Z" /></>,
     spark: <><path d="m12 2 2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4Z" /></>,
     arrow: <><path d="M5 12h14M14 7l5 5-5 5" /></>,
+    trend: <><path d="m4 17 5-5 4 3 7-8" /><path d="M15 7h5v5" /></>,
+    alert: <><path d="M12 3 2.8 19h18.4Z" /><path d="M12 9v4M12 17h.01" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   };
 
   return <svg className="ui-icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;

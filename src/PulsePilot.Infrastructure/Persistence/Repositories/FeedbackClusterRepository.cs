@@ -71,6 +71,25 @@ internal sealed class FeedbackClusterRepository(AppDbContext dbContext)
             cancellationToken);
     }
 
+    public Task<int> CountByPriorityAsync(
+        Guid workspaceId,
+        FeedbackPriority priority,
+        CancellationToken cancellationToken = default)
+    {
+        if (!Enum.IsDefined(priority))
+        {
+            throw new ArgumentOutOfRangeException(nameof(priority));
+        }
+
+        return dbContext.FeedbackClusters.CountAsync(
+            cluster => cluster.WorkspaceId == workspaceId
+                && cluster.Priority == priority
+                && dbContext.Feedback.Any(feedback =>
+                    feedback.WorkspaceId == workspaceId
+                    && feedback.FeedbackClusterId == cluster.Id),
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<FeedbackClusterMemberData>> ListMembersAsync(
         Guid workspaceId,
         Guid clusterId,

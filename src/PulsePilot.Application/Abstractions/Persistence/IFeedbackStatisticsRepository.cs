@@ -4,6 +4,12 @@ namespace PulsePilot.Application.Abstractions.Persistence;
 
 public interface IFeedbackStatisticsRepository
 {
+    Task<int> CountCreatedAsync(
+        Guid workspaceId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        CancellationToken cancellationToken = default);
+
     Task<FeedbackStatisticsSnapshot> GetAsync(
         Guid workspaceId,
         DateTimeOffset fromInclusive,

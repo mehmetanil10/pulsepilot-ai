@@ -20,6 +20,11 @@ public interface IFeedbackClusterRepository
         Guid workspaceId,
         CancellationToken cancellationToken = default);
 
+    Task<int> CountByPriorityAsync(
+        Guid workspaceId,
+        FeedbackPriority priority,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<FeedbackClusterMemberData>> ListMembersAsync(
         Guid workspaceId,
         Guid clusterId,

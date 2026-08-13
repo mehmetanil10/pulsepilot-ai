@@ -19,6 +19,10 @@ Open `http://localhost:3000`. The JWT returned by the API is stored only in an
 HttpOnly cookie; browser code calls `/api/backend/*` instead of receiving the
 token directly.
 
+The dashboard reads `/api/dashboard/summary` and `/api/dashboard/trending`
+directly from the API in a server component. Its 7, 30, and 90-day views are
+always uncached so workspace metrics reflect the current backend state.
+
 ## Checks
 
 ```powershell

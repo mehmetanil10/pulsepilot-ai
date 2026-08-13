@@ -12,7 +12,9 @@ workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, idempotent demo seed, and a Next.js 16 App Router frontend foundation are
 ready. The web app includes a responsive product shell, login and registration
 flows, HttpOnly JWT sessions, an allowlisted same-origin API gateway, and a
-standalone production container. The AI intelligence foundation now
+standalone production container. Its live dashboard now presents workspace-scoped
+KPIs, trending issue momentum, processing health, recent feedback, pending AI
+actions, and category distribution. The AI intelligence foundation now
 includes provider-independent structured analysis contracts, a persisted
 `FeedbackAnalysis` model, an OpenAI Responses API adapter with strict Structured
 Outputs, and pgvector-backed feedback embeddings. A separate database-backed
@@ -114,8 +116,19 @@ The browser never receives the API access token in JavaScript-readable storage.
 Login and registration Route Handlers keep it in a `Secure`, `HttpOnly`,
 `SameSite=Lax` cookie in production. Authenticated browser requests use the
 allowlisted `/api/backend/*` gateway, while the ASP.NET Core API remains the
-authorization source of truth. Dashboard data is intentionally reserved for
-Sprint 3 Task 28.
+authorization source of truth. Dashboard data is loaded only by the authenticated
+server-rendered experience.
+
+The live dashboard uses two authenticated, workspace-scoped API endpoints:
+
+- `GET /api/dashboard/summary?periodDays=7`
+- `GET /api/dashboard/trending?periodDays=7&limit=5`
+
+The summary response includes feedback received since 00:00 UTC, analyzed
+feedback and failures for the selected period, active P1 clusters, pending action
+count, recent feedback metadata, pending-action previews, and category totals.
+The frontend validates both API response shapes before rendering and supports
+7, 30, and 90-day views without exposing the access token to browser code.
 
 ## Demo seed data
 

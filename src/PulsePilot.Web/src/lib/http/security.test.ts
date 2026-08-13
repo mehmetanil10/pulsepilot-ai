@@ -28,6 +28,29 @@ describe("same-origin mutation check", () => {
         }),
       ),
     ).toBe(true);
+    expect(
+      hasTrustedOrigin(
+        new Request("http://localhost:3000/api/auth/login", {
+          method: "POST",
+          headers: {
+            Host: "localhost:13000",
+            Origin: "http://localhost:13000",
+          },
+        }),
+      ),
+    ).toBe(true);
+    expect(
+      hasTrustedOrigin(
+        new Request("http://web:3000/api/auth/login", {
+          method: "POST",
+          headers: {
+            Host: "app.pulsepilot.ai",
+            Origin: "https://app.pulsepilot.ai",
+            "X-Forwarded-Proto": "https",
+          },
+        }),
+      ),
+    ).toBe(true);
     expect(hasTrustedOrigin(new Request("https://app.pulsepilot.ai/api/health"))).toBe(true);
   });
 
@@ -42,6 +65,17 @@ describe("same-origin mutation check", () => {
         new Request("https://app.pulsepilot.ai/api/auth/login", {
           method: "POST",
           headers: { Origin: "https://attacker.example" },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      hasTrustedOrigin(
+        new Request("http://localhost:3000/api/auth/login", {
+          method: "POST",
+          headers: {
+            Host: "localhost:13000,attacker.example",
+            Origin: "http://localhost:13000",
+          },
         }),
       ),
     ).toBe(false);

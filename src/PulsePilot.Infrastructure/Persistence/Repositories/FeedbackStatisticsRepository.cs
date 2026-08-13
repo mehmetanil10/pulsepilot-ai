@@ -7,27 +7,30 @@ namespace PulsePilot.Infrastructure.Persistence.Repositories;
 internal sealed class FeedbackStatisticsRepository(AppDbContext dbContext)
     : IFeedbackStatisticsRepository
 {
+    public Task<int> CountCreatedAsync(
+        Guid workspaceId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateBoundaries(workspaceId, fromInclusive, toExclusive);
+
+        return dbContext.Feedback
+            .AsNoTracking()
+            .CountAsync(
+                feedback => feedback.WorkspaceId == workspaceId
+                    && feedback.CreatedAt >= fromInclusive
+                    && feedback.CreatedAt < toExclusive,
+                cancellationToken);
+    }
+
     public async Task<FeedbackStatisticsSnapshot> GetAsync(
         Guid workspaceId,
         DateTimeOffset fromInclusive,
         DateTimeOffset toExclusive,
         CancellationToken cancellationToken = default)
     {
-        if (workspaceId == Guid.Empty)
-        {
-            throw new ArgumentException("Workspace id is required.", nameof(workspaceId));
-        }
-
-        if (fromInclusive.Offset != TimeSpan.Zero || toExclusive.Offset != TimeSpan.Zero)
-        {
-            throw new ArgumentException("Feedback statistics boundaries must use UTC.");
-        }
-
-        if (fromInclusive >= toExclusive)
-        {
-            throw new ArgumentException(
-                "Feedback statistics start must be before the end boundary.");
-        }
+        ValidateBoundaries(workspaceId, fromInclusive, toExclusive);
 
         var feedbackQuery = dbContext.Feedback
             .AsNoTracking()
@@ -111,5 +114,27 @@ internal sealed class FeedbackStatisticsRepository(AppDbContext dbContext)
                     item.Value,
                     item.Count))
                 .ToList());
+    }
+
+    private static void ValidateBoundaries(
+        Guid workspaceId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive)
+    {
+        if (workspaceId == Guid.Empty)
+        {
+            throw new ArgumentException("Workspace id is required.", nameof(workspaceId));
+        }
+
+        if (fromInclusive.Offset != TimeSpan.Zero || toExclusive.Offset != TimeSpan.Zero)
+        {
+            throw new ArgumentException("Feedback statistics boundaries must use UTC.");
+        }
+
+        if (fromInclusive >= toExclusive)
+        {
+            throw new ArgumentException(
+                "Feedback statistics start must be before the end boundary.");
+        }
     }
 }
