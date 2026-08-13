@@ -511,7 +511,7 @@ public sealed class OpenAILlmClientTests
         });
 
         return new OpenAILlmClient(
-            responsesClient,
+            new OpenAIResponseExecutor(responsesClient),
             embeddingClient,
             options,
             new FeedbackAnalysisResultValidator(),

@@ -3,11 +3,6 @@ using PulsePilot.Application.Common.Exceptions;
 
 namespace PulsePilot.Application.Agents;
 
-internal sealed class EmptyAgentToolCatalog : IAgentToolCatalog
-{
-    public IReadOnlyList<AgentToolDefinition> ListTools() => [];
-}
-
 internal sealed class DisabledAgentToolExecutor : IAgentToolExecutor
 {
     public Task<AgentToolExecutionOutput> ExecuteAsync(

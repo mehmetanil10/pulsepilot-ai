@@ -21,11 +21,12 @@ across concurrent worker replicas. High-priority clusters now produce durable,
 human-reviewable `PendingAction` recommendations. Approved engineering actions
 execute the controlled `CreateBacklogItemTool`; approved customer-response
 actions generate persisted, unsent drafts through `DraftCustomerResponseTool`.
-`SearchSimilarFeedbackTool` exposes workspace-scoped semantic retrieval for the
-upcoming agent orchestrator. `GenerateReportTool` now combines deterministic
+`SearchSimilarFeedbackTool` exposes workspace-scoped semantic retrieval to the
+agent runtime. `GenerateReportTool` now combines deterministic
 workspace statistics and trends with a strictly validated AI narrative for
 on-demand weekly product intelligence reports. A provider-neutral agent
-orchestration runtime now supports bounded multi-turn execution while keeping
+orchestration runtime now supports bounded multi-turn execution, strict OpenAI
+Responses function calling, and four allowlisted analytical tools while keeping
 workspace identity under backend control. EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
@@ -289,10 +290,27 @@ argument payload and schema must be a JSON object. Invalid provider turns fail
 closed before any calls in that turn execute. The final turn cannot execute a
 tool because no turn would remain to synthesize a user-facing answer.
 
-Task 24 intentionally ships with an empty tool catalog and an unavailable agent
-turn client, so the runtime cannot accidentally invoke tools before the Task 25
-tool-calling adapter and allowlist are connected. The Copilot HTTP endpoint will
-be added separately after that runtime is available.
+The runtime exposes exactly four read-only or analytical functions:
+`search_similar_feedback`, `get_feedback_statistics`, `get_trending_issues`, and
+`generate_report`. Backlog creation and customer-response drafting remain behind
+the existing human-approval workflow and are deliberately absent from the agent
+allowlist. Input schemas follow OpenAI's
+[strict function-calling requirements](https://developers.openai.com/api/docs/guides/function-calling):
+all properties are required, nullable types represent optional values, and
+additional properties are rejected.
+
+The backend binds arguments case-sensitively, rejects missing, duplicate, unknown,
+or out-of-range fields, and dispatches only known tool names with the trusted
+workspace context. Expected domain failures become stable, non-sensitive error
+objects. Similar-feedback content and list sizes are reduced before returning
+results to the model.
+
+The OpenAI Responses adapter sends `store: false`, replays function calls,
+function outputs, and encrypted reasoning state in order, and wraps every tool
+result with an explicit success marker. Its instructions treat user and tool
+content as untrusted data and prohibit claims of side effects. Provider transport,
+status, refusal, and timeout mapping is shared by structured AI calls and agent
+turns. The authenticated Copilot HTTP endpoint remains a separate next task.
 
 ## AI intelligence foundation
 

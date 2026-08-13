@@ -16,6 +16,9 @@ internal sealed partial class AgentOrchestrator(
     private const int MaxToolDescriptionLength = 1_000;
     private const int MaxToolSchemaLength = 16_000;
     private const int MaxCallIdLength = 128;
+    private const int MaxContinuationItemLength = 100_000;
+    private const int MaxContinuationItems = 64;
+    private const int MaxTotalContinuationLength = 250_000;
 
     private readonly AgentOrchestrationOptions _options = options.Value;
 
@@ -68,6 +71,7 @@ internal sealed partial class AgentOrchestrator(
         var tools = availableTools.ToArray();
         var allowedToolNames = ValidateToolCatalog(tools);
         var exchanges = new List<AgentToolExchange>();
+        var continuationItems = new List<AgentContinuationItem>();
         var usages = new List<AgentToolUsage>();
         var usedCallIds = new HashSet<string>(StringComparer.Ordinal);
 
@@ -77,9 +81,14 @@ internal sealed partial class AgentOrchestrator(
                 new AgentTurnRequest(
                     userMessage,
                     tools,
-                    exchanges.ToArray()),
+                    exchanges.ToArray(),
+                    continuationItems.ToArray()),
                 cancellationToken);
             ValidateTurnResponse(turn);
+            AppendContinuationItems(
+                turn.ContinuationItems,
+                continuationItems,
+                exchanges.Count);
 
             if (!string.IsNullOrWhiteSpace(turn.FinalAnswer))
             {
@@ -198,6 +207,41 @@ internal sealed partial class AgentOrchestrator(
         {
             throw new InvalidOperationException(
                 "An agent tool returned output outside the accepted contract.");
+        }
+    }
+
+    private static void AppendContinuationItems(
+        IReadOnlyList<AgentContinuationItem>? newItems,
+        ICollection<AgentContinuationItem> allItems,
+        int currentToolExchangeCount)
+    {
+        if (newItems is null)
+        {
+            return;
+        }
+
+        if (allItems.Count + newItems.Count > MaxContinuationItems)
+        {
+            throw CreateInvalidResponseException();
+        }
+
+        foreach (var item in newItems)
+        {
+            if (item is null
+                || item.BeforeToolExchangeIndex != currentToolExchangeCount
+                || string.IsNullOrWhiteSpace(item.OpaqueValue)
+                || item.OpaqueValue.Length > MaxContinuationItemLength)
+            {
+                throw CreateInvalidResponseException();
+            }
+
+            allItems.Add(item);
+        }
+
+        if (allItems.Sum(item => item.OpaqueValue.Length)
+            > MaxTotalContinuationLength)
+        {
+            throw CreateInvalidResponseException();
         }
     }
 

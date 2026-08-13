@@ -38,8 +38,8 @@ public static class DependencyInjection
         services.AddScoped<IFeedbackClusterService, FeedbackClusterService>();
         services.AddScoped<IFeedbackAnalysisProcessor, FeedbackAnalysisProcessor>();
         services.AddSingleton<IPriorityScoreCalculator, PriorityScoreCalculator>();
+        services.AddSingleton<IAgentToolCatalog, AgentToolCatalog>();
         services.TryAddScoped<IAgentTurnClient, UnavailableAgentTurnClient>();
-        services.TryAddSingleton<IAgentToolCatalog, EmptyAgentToolCatalog>();
         services.TryAddScoped<IAgentToolExecutor, DisabledAgentToolExecutor>();
         services.AddOptions<AgentOrchestrationOptions>();
         services.AddOptions<FeedbackProcessingOptions>();

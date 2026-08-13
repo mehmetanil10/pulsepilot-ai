@@ -18,14 +18,20 @@ public sealed record AgentToolExchange(
     AgentToolCall Call,
     AgentToolExecutionOutput Output);
 
+public sealed record AgentContinuationItem(
+    int BeforeToolExchangeIndex,
+    string OpaqueValue);
+
 public sealed record AgentTurnRequest(
     string UserMessage,
     IReadOnlyList<AgentToolDefinition> AvailableTools,
-    IReadOnlyList<AgentToolExchange> PreviousToolExchanges);
+    IReadOnlyList<AgentToolExchange> PreviousToolExchanges,
+    IReadOnlyList<AgentContinuationItem>? PreviousContinuationItems = null);
 
 public sealed record AgentTurnResponse(
     string? FinalAnswer,
-    IReadOnlyList<AgentToolCall> ToolCalls);
+    IReadOnlyList<AgentToolCall> ToolCalls,
+    IReadOnlyList<AgentContinuationItem>? ContinuationItems = null);
 
 public sealed record AgentToolUsage(
     string CallId,

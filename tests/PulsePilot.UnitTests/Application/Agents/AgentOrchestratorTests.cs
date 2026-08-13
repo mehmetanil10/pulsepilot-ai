@@ -61,7 +61,10 @@ public sealed class AgentOrchestratorTests
             StatisticsTool.Name,
             "{\"periodDays\":7}");
         var client = new SequenceAgentTurnClient(
-            new AgentTurnResponse(null, [call]),
+            new AgentTurnResponse(
+                null,
+                [call],
+                [new AgentContinuationItem(0, "opaque-state")]),
             new AgentTurnResponse(
                 "Feedback volume was stable during the last seven days.",
                 []));
@@ -87,6 +90,10 @@ public sealed class AgentOrchestratorTests
         Assert.Same(call, execution.Call);
         Assert.Equal(2, client.Requests.Count);
         Assert.Empty(client.Requests[0].PreviousToolExchanges);
+        var continuation = Assert.Single(
+            client.Requests[1].PreviousContinuationItems!);
+        Assert.Equal(0, continuation.BeforeToolExchangeIndex);
+        Assert.Equal("opaque-state", continuation.OpaqueValue);
         var exchange = Assert.Single(client.Requests[1].PreviousToolExchanges);
         Assert.Same(call, exchange.Call);
         Assert.True(exchange.Output.Succeeded);

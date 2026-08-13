@@ -5,6 +5,7 @@ using System.ClientModel.Primitives;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using OpenAI;
 using OpenAI.Embeddings;
@@ -299,6 +300,7 @@ public static class DependencyInjection
 
             return new ResponsesClient(new ApiKeyCredential(apiKey), clientOptions);
         });
+        services.AddSingleton<OpenAIResponseExecutor>();
 
         services.AddSingleton(serviceProvider =>
         {
@@ -347,6 +349,8 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, AspNetCorePasswordHasher>();
         services.AddSingleton<IAccessTokenGenerator, JwtAccessTokenGenerator>();
         services.AddScoped<ILLMClient, OpenAILlmClient>();
+        services.Replace(ServiceDescriptor.Scoped<IAgentTurnClient, OpenAIAgentTurnClient>());
+        services.Replace(ServiceDescriptor.Scoped<IAgentToolExecutor, AgentToolExecutor>());
 
         return services;
     }
