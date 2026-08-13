@@ -7,6 +7,8 @@
 .nuget/
 **/bin/
 **/obj/
+**/node_modules/
+**/.next/
 tests/
 TestResults/
 coverage/

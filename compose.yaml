@@ -10,6 +10,10 @@ x-worker-build: &worker-build
   dockerfile: Dockerfile
   target: worker-final
 
+x-web-build: &web-build
+  context: ./src/PulsePilot.Web
+  dockerfile: Dockerfile
+
 x-api-environment: &api-environment
   ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
   ASPNETCORE_HTTP_PORTS: "8080"
@@ -123,6 +127,26 @@ services:
     read_only: true
     tmpfs:
       - /tmp
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    stop_grace_period: 15s
+
+  web:
+    image: pulsepilot-web:${IMAGE_TAG:-local}
+    build: *web-build
+    environment:
+      PULSEPILOT_API_URL: http://api:8080
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=1001,gid=1001
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped

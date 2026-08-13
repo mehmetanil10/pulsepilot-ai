@@ -9,7 +9,10 @@ issues, and keep critical actions behind human approval.
 Sprint 1 and Sprint 2 are complete, and Sprint 3 is in progress. The .NET 10 Clean Architecture
 foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
-stack, and idempotent demo seed are ready. The AI intelligence foundation now
+stack, idempotent demo seed, and a Next.js 16 App Router frontend foundation are
+ready. The web app includes a responsive product shell, login and registration
+flows, HttpOnly JWT sessions, an allowlisted same-origin API gateway, and a
+standalone production container. The AI intelligence foundation now
 includes provider-independent structured analysis contracts, a persisted
 `FeedbackAnalysis` model, an OpenAI Responses API adapter with strict Structured
 Outputs, and pgvector-backed feedback embeddings. A separate database-backed
@@ -38,6 +41,7 @@ integration tests are included.
 - `PulsePilot.Infrastructure`: persistence and external service adapters
 - `PulsePilot.Api`: ASP.NET Core HTTP API
 - `PulsePilot.Worker`: durable background feedback analysis host
+- `PulsePilot.Web`: Next.js App Router frontend and secure backend gateway
 - `PulsePilot.UnitTests`: domain and application tests
 - `PulsePilot.IntegrationTests`: API and infrastructure tests
 
@@ -56,9 +60,9 @@ PostgreSQL containers automatically.
 
 ## Docker setup
 
-The stack contains the API, background worker, and PostgreSQL 17 with pgvector.
-A one-shot migration service must complete successfully before the API and
-worker start.
+The stack contains the web app, API, background worker, and PostgreSQL 17 with
+pgvector. A one-shot migration service must complete successfully before the API
+and worker start; the web app waits for the API readiness check.
 
 Create the local environment file and replace the PostgreSQL and JWT placeholder
 secrets. The JWT secret must contain at least 32 random bytes:
@@ -76,13 +80,15 @@ Build and start the stack:
 docker compose up --build --detach
 docker compose ps
 Invoke-RestMethod http://localhost:8080/health/ready
+Invoke-RestMethod http://localhost:3000/api/health
 ```
 
-Swagger UI is available at `http://localhost:8080/swagger` when the environment
+PulsePilot Web is available at `http://localhost:3000`. Swagger UI is available
+at `http://localhost:8080/swagger` when the environment
 is `Development`. View logs or stop the stack with:
 
 ```powershell
-docker compose logs --follow api worker
+docker compose logs --follow web api worker
 docker compose down
 ```
 
@@ -92,6 +98,24 @@ data volume.
 The API uses JWT bearer authentication and an ephemeral Data Protection provider;
 no cookie-encryption keys or application secrets are written into the image or
 container filesystem.
+
+## Web frontend
+
+The frontend lives in `src/PulsePilot.Web` and requires Node.js 20.19 or newer
+to satisfy the complete Next.js and ESLint toolchain.
+For local development, copy its `.env.example` to `.env.local`, then run:
+
+```powershell
+npm --prefix src/PulsePilot.Web install
+npm --prefix src/PulsePilot.Web run dev
+```
+
+The browser never receives the API access token in JavaScript-readable storage.
+Login and registration Route Handlers keep it in a `Secure`, `HttpOnly`,
+`SameSite=Lax` cookie in production. Authenticated browser requests use the
+allowlisted `/api/backend/*` gateway, while the ASP.NET Core API remains the
+authorization source of truth. Dashboard data is intentionally reserved for
+Sprint 3 Task 28.
 
 ## Demo seed data
 
