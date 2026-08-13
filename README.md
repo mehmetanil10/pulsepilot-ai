@@ -222,6 +222,11 @@ similarity threshold, or embedding vector.
   context, while the backend applies the configured similarity threshold and
   returns only completed, non-deleted matches. The source embedding must still
   match the feedback's current title and content.
+- `GetFeedbackStatisticsTool` accepts an optional bounded lookback period. It
+  returns total and analyzed feedback counts, average severity, and zero-filled
+  processing-status, source, category, component, sentiment, and severity
+  distributions. Statistics use feedback creation time and exclude soft-deleted
+  or cross-workspace records.
 
 The existing `GET /api/feedback/{id}/similar` endpoint delegates to the same
 search tool, keeping API and future agent behavior consistent.

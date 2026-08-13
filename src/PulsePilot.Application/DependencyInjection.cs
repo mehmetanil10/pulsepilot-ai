@@ -22,12 +22,14 @@ public static class DependencyInjection
         services.AddScoped<IPendingActionService, PendingActionService>();
         services.AddScoped<IPendingActionRecommender, PendingActionRecommender>();
         services.AddScoped<ICreateBacklogItemTool, CreateBacklogItemTool>();
+        services.AddScoped<IGetFeedbackStatisticsTool, GetFeedbackStatisticsTool>();
         services.AddScoped<ISearchSimilarFeedbackTool, SearchSimilarFeedbackTool>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IFeedbackClusterService, FeedbackClusterService>();
         services.AddScoped<IFeedbackAnalysisProcessor, FeedbackAnalysisProcessor>();
         services.AddSingleton<IPriorityScoreCalculator, PriorityScoreCalculator>();
         services.AddOptions<FeedbackProcessingOptions>();
+        services.AddOptions<FeedbackStatisticsOptions>();
         services.AddOptions<SemanticSearchOptions>();
         services.AddOptions<PriorityScoringOptions>();
         services.TryAddSingleton(TimeProvider.System);

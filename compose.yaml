@@ -30,6 +30,8 @@ x-api-environment: &api-environment
   SemanticSearch__SimilarityThreshold: ${SIMILARITY_THRESHOLD:-0.80}
   SemanticSearch__DefaultLimit: ${SIMILARITY_DEFAULT_LIMIT:-10}
   SemanticSearch__MaxLimit: ${SIMILARITY_MAX_LIMIT:-50}
+  FeedbackStatistics__DefaultPeriodDays: ${FEEDBACK_STATISTICS_DEFAULT_PERIOD_DAYS:-7}
+  FeedbackStatistics__MaxPeriodDays: ${FEEDBACK_STATISTICS_MAX_PERIOD_DAYS:-365}
   PriorityScoring__SeverityWeight: ${PRIORITY_SEVERITY_WEIGHT:-0.35}
   PriorityScoring__FrequencyWeight: ${PRIORITY_FREQUENCY_WEIGHT:-0.30}
   PriorityScoring__CustomerImpactWeight: ${PRIORITY_CUSTOMER_IMPACT_WEIGHT:-0.20}

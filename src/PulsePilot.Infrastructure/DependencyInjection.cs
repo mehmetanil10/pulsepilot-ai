@@ -15,6 +15,7 @@ using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Feedback;
 using PulsePilot.Application.Prioritization;
+using PulsePilot.Application.Tools;
 using PulsePilot.Infrastructure.AI;
 using PulsePilot.Infrastructure.Authentication;
 using PulsePilot.Infrastructure.Persistence;
@@ -79,6 +80,21 @@ public static class DependencyInjection
             .Validate(
                 options => options.DefaultLimit <= options.MaxLimit,
                 "Semantic search default limit cannot exceed its maximum limit.")
+            .ValidateOnStart();
+
+        services.AddOptions<FeedbackStatisticsOptions>()
+            .Bind(configuration.GetSection(FeedbackStatisticsOptions.SectionName))
+            .Validate(
+                options => options.DefaultPeriodDays is >= 1
+                    and <= FeedbackStatisticsOptions.MaximumAllowedPeriod,
+                $"Feedback statistics default period must be between 1 and {FeedbackStatisticsOptions.MaximumAllowedPeriod} days.")
+            .Validate(
+                options => options.MaxPeriodDays is >= 1
+                    and <= FeedbackStatisticsOptions.MaximumAllowedPeriod,
+                $"Feedback statistics maximum period must be between 1 and {FeedbackStatisticsOptions.MaximumAllowedPeriod} days.")
+            .Validate(
+                options => options.DefaultPeriodDays <= options.MaxPeriodDays,
+                "Feedback statistics default period cannot exceed its maximum period.")
             .ValidateOnStart();
 
         services.AddOptions<PriorityScoringOptions>()
@@ -194,6 +210,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
         services.AddScoped<IWorkspaceMemberRepository, WorkspaceMemberRepository>();
         services.AddScoped<IFeedbackRepository, FeedbackRepository>();
+        services.AddScoped<IFeedbackStatisticsRepository, FeedbackStatisticsRepository>();
         services.AddScoped<IFeedbackAnalysisRepository, FeedbackAnalysisRepository>();
         services.AddScoped<IFeedbackEmbeddingRepository, FeedbackEmbeddingRepository>();
         services.AddScoped<IFeedbackClusterRepository, FeedbackClusterRepository>();
