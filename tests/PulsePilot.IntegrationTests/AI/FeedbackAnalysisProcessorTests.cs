@@ -535,6 +535,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
 
             return Task.FromResult(CreateEmbeddingResult());
         }
+
+        public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+            CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class BlockingLlmClient : ILLMClient
@@ -568,6 +575,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
 
             return Task.FromResult(CreateEmbeddingResult());
         }
+
+        public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+            CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class TimeoutLlmClient : ILLMClient
@@ -593,6 +607,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
             cancellationToken.ThrowIfCancellationRequested();
 
             return Task.FromResult(CreateEmbeddingResult());
+        }
+
+        public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+            CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
     }
 
@@ -630,6 +651,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
             }
 
             return responses[index](request);
+        }
+
+        public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+            CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
     }
 

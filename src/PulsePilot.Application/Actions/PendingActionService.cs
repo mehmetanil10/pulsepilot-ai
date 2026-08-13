@@ -11,6 +11,7 @@ internal sealed class PendingActionService(
     IPendingActionRepository pendingActionRepository,
     IPendingActionExecutionLock pendingActionExecutionLock,
     ICreateBacklogItemTool createBacklogItemTool,
+    IDraftCustomerResponseTool draftCustomerResponseTool,
     IUnitOfWork unitOfWork,
     ICurrentUserContext currentUser,
     TimeProvider timeProvider) : IPendingActionService
@@ -121,6 +122,14 @@ internal sealed class PendingActionService(
                     reviewedAt,
                     cancellationToken);
             }
+            else if (pendingAction.ActionType == PendingActionType.DraftCustomerResponse)
+            {
+                await draftCustomerResponseTool.ExecuteAsync(
+                    pendingAction,
+                    currentUser.UserId,
+                    reviewedAt,
+                    cancellationToken);
+            }
         }
         else
         {
@@ -162,7 +171,6 @@ internal sealed class PendingActionService(
     {
         return pendingAction.Status == decision
             || (decision == PendingActionStatus.Approved
-                && pendingAction.ActionType == PendingActionType.CreateEngineeringIssue
                 && pendingAction.Status == PendingActionStatus.Executed);
     }
 

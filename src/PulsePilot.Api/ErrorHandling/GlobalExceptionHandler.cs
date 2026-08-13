@@ -76,6 +76,13 @@ public sealed class GlobalExceptionHandler(
                 StatusCodes.Status409Conflict,
                 "Conflict",
                 exception.Message),
+            LlmProviderException llmException => CreateKnownProblemDetails(
+                llmException.IsTransient
+                    || llmException.FailureKind == LlmProviderFailureKind.NotConfigured
+                    ? StatusCodes.Status503ServiceUnavailable
+                    : StatusCodes.Status502BadGateway,
+                "AI provider unavailable",
+                "The AI provider could not produce the requested output."),
             DomainException => CreateKnownProblemDetails(
                 StatusCodes.Status422UnprocessableEntity,
                 "Business rule violation",

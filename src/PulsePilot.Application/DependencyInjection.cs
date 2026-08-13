@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using PulsePilot.Application.Actions;
 using PulsePilot.Application.Authentication;
 using PulsePilot.Application.Backlog;
+using PulsePilot.Application.CustomerResponses;
 using PulsePilot.Application.Feedback;
 using PulsePilot.Application.FeedbackClusters;
 using PulsePilot.Application.FeedbackProcessing;
@@ -19,9 +20,11 @@ public static class DependencyInjection
         services.AddValidatorsFromAssemblyContaining(typeof(DependencyInjection));
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IBacklogItemService, BacklogItemService>();
+        services.AddScoped<ICustomerResponseDraftService, CustomerResponseDraftService>();
         services.AddScoped<IPendingActionService, PendingActionService>();
         services.AddScoped<IPendingActionRecommender, PendingActionRecommender>();
         services.AddScoped<ICreateBacklogItemTool, CreateBacklogItemTool>();
+        services.AddScoped<IDraftCustomerResponseTool, DraftCustomerResponseTool>();
         services.AddScoped<IGetFeedbackStatisticsTool, GetFeedbackStatisticsTool>();
         services.AddScoped<IGetTrendingIssuesTool, GetTrendingIssuesTool>();
         services.AddScoped<ISearchSimilarFeedbackTool, SearchSimilarFeedbackTool>();
@@ -30,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<IFeedbackAnalysisProcessor, FeedbackAnalysisProcessor>();
         services.AddSingleton<IPriorityScoreCalculator, PriorityScoreCalculator>();
         services.AddOptions<FeedbackProcessingOptions>();
+        services.AddOptions<CustomerResponseDraftingOptions>();
         services.AddOptions<FeedbackStatisticsOptions>();
         services.AddOptions<SemanticSearchOptions>();
         services.AddOptions<TrendingIssuesOptions>();

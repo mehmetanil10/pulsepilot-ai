@@ -234,5 +234,12 @@ public sealed class Sprint2AcceptanceTests(PostgreSqlFixture database)
                 Enumerable.Repeat(0.1f, FeedbackEmbedding.Dimensions).ToArray(),
                 "sprint-2-acceptance-model"));
         }
+
+        public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+            CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

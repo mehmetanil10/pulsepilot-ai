@@ -5,11 +5,15 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Actions;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Authentication;
+using PulsePilot.Application.Common.Exceptions;
+using PulsePilot.Application.CustomerResponses;
 using PulsePilot.Domain.Actions;
 using PulsePilot.Domain.Backlog;
 using PulsePilot.Domain.Feedback;
@@ -30,7 +34,14 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
     [Fact]
     public async Task ReviewEndpoints_EnforceAdminWorkspaceAndIdempotentDecisions()
     {
-        await using var factory = new PulsePilotApiFactory(database.ConnectionString);
+        var llmClient = new CustomerResponseLlmClient();
+        await using var factory = new PulsePilotApiFactory(
+            database.ConnectionString,
+            services =>
+            {
+                services.RemoveAll<ILLMClient>();
+                services.AddSingleton<ILLMClient>(llmClient);
+            });
         var owner = await CreateAuthenticatedClientAsync(factory, "review-owner");
         var outsider = await CreateAuthenticatedClientAsync(factory, "review-outsider");
         using var ownerClient = owner.Client;
@@ -62,6 +73,17 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
             content: null);
         var approvedCustomerResponse = await customerResponseApproveResponse.Content
             .ReadFromJsonAsync<PendingActionResponse>(SerializerOptions);
+        using var repeatedCustomerResponseApprove = await ownerClient.PostAsync(
+            $"/api/actions/{customerResponseAction.Id}/approve",
+            content: null);
+        using var customerDraftResponse = await ownerClient.GetAsync(
+            $"/api/actions/{customerResponseAction.Id}/customer-response-draft");
+        var customerDraft = await customerDraftResponse.Content
+            .ReadFromJsonAsync<CustomerResponseDraftResponse>(SerializerOptions);
+        using var outsiderDraftResponse = await outsiderClient.GetAsync(
+            $"/api/actions/{customerResponseAction.Id}/customer-response-draft");
+        using var anonymousDraftResponse = await anonymousClient.GetAsync(
+            $"/api/actions/{customerResponseAction.Id}/customer-response-draft");
 
         using var rejectResponse = await ownerClient.PostAsync(
             $"/api/actions/{actions[1].Id}/reject",
@@ -95,8 +117,17 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
         Assert.Equal(approved.ExecutedAt, repeatedApproval?.ExecutedAt);
         Assert.Equal(HttpStatusCode.Conflict, conflictingRejectResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, customerResponseApproveResponse.StatusCode);
-        Assert.Equal(PendingActionStatus.Approved, approvedCustomerResponse?.Status);
-        Assert.Null(approvedCustomerResponse?.ExecutedAt);
+        Assert.Equal(PendingActionStatus.Executed, approvedCustomerResponse?.Status);
+        Assert.NotNull(approvedCustomerResponse?.ExecutedAt);
+        Assert.Equal(HttpStatusCode.OK, repeatedCustomerResponseApprove.StatusCode);
+        Assert.Equal(1, llmClient.DraftCallCount);
+        Assert.Equal(HttpStatusCode.OK, customerDraftResponse.StatusCode);
+        Assert.NotNull(customerDraft);
+        Assert.Equal(customerResponseAction.Id, customerDraft.SourcePendingActionId);
+        Assert.Equal(owner.Authentication.UserId, customerDraft.CreatedByUserId);
+        Assert.Equal(CustomerResponseLlmClient.DraftContent, customerDraft.Content);
+        Assert.Equal(HttpStatusCode.NotFound, outsiderDraftResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousDraftResponse.StatusCode);
 
         Assert.Equal(HttpStatusCode.OK, rejectResponse.StatusCode);
         Assert.NotNull(rejected);
@@ -195,6 +226,44 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
                 response.Dispose();
             }
         }
+    }
+
+    [Fact]
+    public async Task CustomerResponseApproval_WhenProviderFails_LeavesActionPendingWithoutDraft()
+    {
+        var llmClient = new FailingCustomerResponseLlmClient();
+        await using var factory = new PulsePilotApiFactory(
+            database.ConnectionString,
+            services =>
+            {
+                services.RemoveAll<ILLMClient>();
+                services.AddSingleton<ILLMClient>(llmClient);
+            });
+        var owner = await CreateAuthenticatedClientAsync(factory, "draft-provider-failure");
+        using var ownerClient = owner.Client;
+        var action = Assert.Single(await SeedPendingActionsAsync(
+            factory,
+            owner.Authentication,
+            count: 1,
+            actionType: PendingActionType.DraftCustomerResponse));
+
+        using var response = await ownerClient.PostAsync(
+            $"/api/actions/{action.Id}/approve",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal(2, llmClient.DraftCallCount);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedAction = await dbContext.PendingActions
+            .AsNoTracking()
+            .SingleAsync(candidate => candidate.Id == action.Id);
+
+        Assert.Equal(PendingActionStatus.Pending, persistedAction.Status);
+        Assert.False(await dbContext.CustomerResponseDrafts
+            .AsNoTracking()
+            .AnyAsync(draft => draft.SourcePendingActionId == action.Id));
     }
 
     [Fact]
@@ -311,6 +380,8 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
         var feedbackRepository = scope.ServiceProvider.GetRequiredService<IFeedbackRepository>();
         var actionRepository = scope.ServiceProvider
             .GetRequiredService<IPendingActionRepository>();
+        var analysisRepository = scope.ServiceProvider
+            .GetRequiredService<IFeedbackAnalysisRepository>();
 
         for (var index = 0; index < count; index++)
         {
@@ -334,6 +405,24 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
                 null,
                 now.AddMilliseconds(index));
             feedback.AssignToCluster(cluster.Id, now.AddSeconds(1));
+
+            if (actionType == PendingActionType.DraftCustomerResponse)
+            {
+                var leaseId = feedback.StartProcessing(now.AddSeconds(2));
+                feedback.CompleteProcessing(leaseId, now.AddSeconds(3));
+                await analysisRepository.AddAsync(FeedbackAnalysis.Create(
+                    owner.WorkspaceId,
+                    feedback.Id,
+                    FeedbackCategory.Complaint,
+                    FeedbackComponent.Payments,
+                    4,
+                    FeedbackSentiment.Negative,
+                    "The customer cannot complete a card payment.",
+                    "Draft an empathetic response for human review.",
+                    0.95m,
+                    now.AddSeconds(3)));
+            }
+
             var action = PendingAction.Create(
                 owner.WorkspaceId,
                 feedback.Id,
@@ -367,4 +456,71 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
     private sealed record AuthenticatedClient(
         HttpClient Client,
         AuthenticationResponse Authentication);
+
+    private sealed class CustomerResponseLlmClient : ILLMClient
+    {
+        public const string DraftContent =
+            "We're sorry you're experiencing this payment issue. Our team is reviewing the report, and we appreciate you bringing it to our attention.";
+
+        private int _draftCallCount;
+
+        public int DraftCallCount => _draftCallCount;
+
+        public Task<FeedbackAnalysisResult> AnalyzeFeedbackAsync(
+            FeedbackAnalysisRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+            FeedbackEmbeddingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+            CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Interlocked.Increment(ref _draftCallCount);
+
+            return Task.FromResult(new CustomerResponseDraftResult(DraftContent));
+        }
+    }
+
+    private sealed class FailingCustomerResponseLlmClient : ILLMClient
+    {
+        private int _draftCallCount;
+
+        public int DraftCallCount => _draftCallCount;
+
+        public Task<FeedbackAnalysisResult> AnalyzeFeedbackAsync(
+            FeedbackAnalysisRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
+            FeedbackEmbeddingRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+            CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _draftCallCount);
+
+            throw new LlmProviderException(
+                LlmProviderFailureKind.ProviderUnavailable,
+                "The AI provider is temporarily unavailable.",
+                isTransient: true);
+        }
+    }
 }

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using PulsePilot.Domain.Actions;
 using PulsePilot.Domain.Backlog;
+using PulsePilot.Domain.CustomerResponses;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
@@ -39,6 +40,9 @@ public sealed class AppDbContextModelTests
         Assert.Equal(
             "backlog_items",
             dbContext.Model.FindEntityType(typeof(BacklogItem))?.GetTableName());
+        Assert.Equal(
+            "customer_response_drafts",
+            dbContext.Model.FindEntityType(typeof(CustomerResponseDraft))?.GetTableName());
     }
 
     [Fact]
@@ -242,6 +246,28 @@ public sealed class AppDbContextModelTests
         Assert.Equal("status IN ('Open', 'InProgress')", activeClusterIndex.GetFilter());
         Assert.All(
             backlogEntity.GetForeignKeys(),
+            foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
+    }
+
+    [Fact]
+    public void CustomerResponseDraft_UsesWorkspaceScopedUniqueSourceAction()
+    {
+        using var dbContext = CreateDbContext();
+        var draftEntity = dbContext.Model.FindEntityType(typeof(CustomerResponseDraft));
+        var sourceActionIndex = Assert.Single(
+            draftEntity!.GetIndexes(),
+            index => index.GetDatabaseName()
+                == "ux_customer_response_drafts_workspace_id_source_action_id");
+
+        Assert.True(sourceActionIndex.IsUnique);
+        Assert.Equal(
+            [
+                nameof(CustomerResponseDraft.WorkspaceId),
+                nameof(CustomerResponseDraft.SourcePendingActionId),
+            ],
+            sourceActionIndex.Properties.Select(property => property.Name));
+        Assert.All(
+            draftEntity.GetForeignKeys(),
             foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
     }
 

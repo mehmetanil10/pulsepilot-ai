@@ -97,6 +97,22 @@ public static class DependencyInjection
                 "Feedback statistics default period cannot exceed its maximum period.")
             .ValidateOnStart();
 
+        services.AddOptions<CustomerResponseDraftingOptions>()
+            .Bind(configuration.GetSection(CustomerResponseDraftingOptions.SectionName))
+            .Validate(
+                options => options.MaxAttempts is >= 1
+                    and <= CustomerResponseDraftingOptions.MaximumAllowedAttempts,
+                $"Customer response drafting attempts must be between 1 and {CustomerResponseDraftingOptions.MaximumAllowedAttempts}.")
+            .Validate(
+                options => options.TimeoutSeconds is >= 1
+                    and <= CustomerResponseDraftingOptions.MaximumAllowedTimeoutSeconds,
+                $"Customer response drafting timeout must be between 1 and {CustomerResponseDraftingOptions.MaximumAllowedTimeoutSeconds} seconds.")
+            .Validate(
+                options => options.RetryDelayMilliseconds is >= 0
+                    and <= CustomerResponseDraftingOptions.MaximumAllowedRetryDelayMilliseconds,
+                $"Customer response drafting retry delay must be between 0 and {CustomerResponseDraftingOptions.MaximumAllowedRetryDelayMilliseconds} milliseconds.")
+            .ValidateOnStart();
+
         services.AddOptions<TrendingIssuesOptions>()
             .Bind(configuration.GetSection(TrendingIssuesOptions.SectionName))
             .Validate(
@@ -243,6 +259,7 @@ public static class DependencyInjection
         services.AddScoped<IFeedbackClusterRepository, FeedbackClusterRepository>();
         services.AddScoped<IPendingActionRepository, PendingActionRepository>();
         services.AddScoped<IBacklogItemRepository, BacklogItemRepository>();
+        services.AddScoped<ICustomerResponseDraftRepository, CustomerResponseDraftRepository>();
         services.AddScoped<IPendingActionExecutionLock, PostgreSqlPendingActionExecutionLock>();
         services.AddScoped<IFeedbackClusterAssignmentLock, PostgreSqlFeedbackClusterAssignmentLock>();
         services.AddScoped<IFeedbackProcessingQueue, FeedbackProcessingQueue>();

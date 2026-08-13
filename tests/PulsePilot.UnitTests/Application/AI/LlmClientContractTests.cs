@@ -86,5 +86,12 @@ public sealed class LlmClientContractTests
                 Enumerable.Repeat(0.1f, FeedbackEmbedding.Dimensions).ToArray(),
                 "deterministic-test-model"));
         }
+
+        public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+            CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

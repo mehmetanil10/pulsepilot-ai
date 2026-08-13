@@ -1,10 +1,15 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace PulsePilot.IntegrationTests.Api;
 
-public sealed class PulsePilotApiFactory(string connectionString) : WebApplicationFactory<Program>
+public sealed class PulsePilotApiFactory(
+    string connectionString,
+    Action<IServiceCollection>? configureTestServices = null)
+    : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -22,5 +27,10 @@ public sealed class PulsePilotApiFactory(string connectionString) : WebApplicati
 
             configurationBuilder.AddInMemoryCollection(values);
         });
+
+        if (configureTestServices is not null)
+        {
+            builder.ConfigureTestServices(configureTestServices);
+        }
     }
 }

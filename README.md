@@ -19,9 +19,10 @@ transaction during either AI call. Cosine similarity search is workspace-scoped,
 and category/component-aware cluster assignment groups related reports safely
 across concurrent worker replicas. High-priority clusters now produce durable,
 human-reviewable `PendingAction` recommendations. Approved engineering actions
-execute the controlled `CreateBacklogItemTool`, while `SearchSimilarFeedbackTool`
-exposes workspace-scoped semantic retrieval for the upcoming agent orchestrator.
-EF Core migrations and
+execute the controlled `CreateBacklogItemTool`; approved customer-response
+actions generate persisted, unsent drafts through `DraftCustomerResponseTool`.
+`SearchSimilarFeedbackTool` exposes workspace-scoped semantic retrieval for the
+upcoming agent orchestrator. EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
 
@@ -193,7 +194,17 @@ one workspace-scoped backlog item, and atomically advances the action to
 `Executed`. Action-level advisory locking and a unique source-action index make
 concurrent repeated approvals idempotent. A filtered unique index also prevents
 more than one `Open` or `InProgress` backlog item for the same source cluster.
-Action types whose tools are not yet implemented remain `Approved`.
+Approving `DraftCustomerResponse` invokes the structured AI drafting contract,
+persists exactly one workspace-scoped draft, and advances the action to
+`Executed` in the same save. Provider failure leaves the action `Pending`, and
+no draft is ever sent automatically. Action types whose tools are not yet
+implemented remain `Approved`.
+
+Generated drafts are available to authenticated members of the owning workspace:
+
+- `GET /api/actions/{id}/customer-response-draft`
+
+Cross-workspace action identifiers return `404`.
 
 ## Backlog API
 
@@ -217,6 +228,10 @@ similarity threshold, or embedding vector.
 
 - `CreateBacklogItemTool` executes only an approved engineering action and is
   idempotent for repeated approvals.
+- `DraftCustomerResponseTool` accepts only an approved customer-response action,
+  requires completed structured feedback analysis, validates a strict AI output,
+  and stores an empathetic draft of at most 120 words. It performs no email,
+  messaging, or other external delivery operation.
 - `SearchSimilarFeedbackTool` accepts a source feedback identifier and an
   optional bounded result limit. The orchestrator supplies the trusted workspace
   context, while the backend applies the configured similarity threshold and
@@ -237,10 +252,10 @@ search tool, keeping API and future agent behavior consistent.
 
 ## AI intelligence foundation
 
-`ILLMClient` defines provider-independent structured analysis and embedding
-boundaries. The analysis result contains category, component, severity,
-sentiment, summary, suggested action, and confidence. Application validation and
-domain invariants
+`ILLMClient` defines provider-independent structured analysis, embedding, and
+customer-response drafting boundaries. The analysis result contains category,
+component, severity, sentiment, summary, suggested action, and confidence.
+Application validation and domain invariants
 reject unsupported enum values, severity outside 1–5, confidence outside 0–1,
 and empty or oversized text before persistence.
 

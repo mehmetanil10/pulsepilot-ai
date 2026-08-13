@@ -11,4 +11,8 @@ public interface ILLMClient
     Task<FeedbackEmbeddingResult> GenerateEmbeddingAsync(
         FeedbackEmbeddingRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
+        CustomerResponseDraftRequest request,
+        CancellationToken cancellationToken = default);
 }
