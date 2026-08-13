@@ -9,6 +9,7 @@ using PulsePilot.Application.Feedback;
 using PulsePilot.Application.FeedbackClusters;
 using PulsePilot.Application.FeedbackProcessing;
 using PulsePilot.Application.Prioritization;
+using PulsePilot.Application.Reports;
 using PulsePilot.Application.Tools;
 
 namespace PulsePilot.Application;
@@ -21,10 +22,12 @@ public static class DependencyInjection
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IBacklogItemService, BacklogItemService>();
         services.AddScoped<ICustomerResponseDraftService, CustomerResponseDraftService>();
+        services.AddScoped<IWeeklyReportService, WeeklyReportService>();
         services.AddScoped<IPendingActionService, PendingActionService>();
         services.AddScoped<IPendingActionRecommender, PendingActionRecommender>();
         services.AddScoped<ICreateBacklogItemTool, CreateBacklogItemTool>();
         services.AddScoped<IDraftCustomerResponseTool, DraftCustomerResponseTool>();
+        services.AddScoped<IGenerateReportTool, GenerateReportTool>();
         services.AddScoped<IGetFeedbackStatisticsTool, GetFeedbackStatisticsTool>();
         services.AddScoped<IGetTrendingIssuesTool, GetTrendingIssuesTool>();
         services.AddScoped<ISearchSimilarFeedbackTool, SearchSimilarFeedbackTool>();
@@ -34,6 +37,7 @@ public static class DependencyInjection
         services.AddSingleton<IPriorityScoreCalculator, PriorityScoreCalculator>();
         services.AddOptions<FeedbackProcessingOptions>();
         services.AddOptions<CustomerResponseDraftingOptions>();
+        services.AddOptions<ReportGenerationOptions>();
         services.AddOptions<FeedbackStatisticsOptions>();
         services.AddOptions<SemanticSearchOptions>();
         services.AddOptions<TrendingIssuesOptions>();

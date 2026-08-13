@@ -22,7 +22,9 @@ human-reviewable `PendingAction` recommendations. Approved engineering actions
 execute the controlled `CreateBacklogItemTool`; approved customer-response
 actions generate persisted, unsent drafts through `DraftCustomerResponseTool`.
 `SearchSimilarFeedbackTool` exposes workspace-scoped semantic retrieval for the
-upcoming agent orchestrator. EF Core migrations and
+upcoming agent orchestrator. `GenerateReportTool` now combines deterministic
+workspace statistics and trends with a strictly validated AI narrative for
+on-demand weekly product intelligence reports. EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
 
@@ -220,6 +222,21 @@ user, priority, and lifecycle status. New tool-created items start as `Open`.
 Cross-workspace identifiers return `404`; list filters cannot expose another
 workspace's records.
 
+## Weekly Report API
+
+Authenticated workspace members can generate an on-demand product intelligence
+report without exposing raw feedback or customer PII to the reporting model:
+
+- `POST /api/reports/weekly`
+
+The optional body accepts `periodDays` and `trendingIssueLimit`; both are bounded
+by configuration. The response includes the deterministic source statistics and
+trending issues alongside a strict structured report containing a title,
+executive summary, key insights, and recommended engineering priorities. The
+tool retries only transient provider failures with a bounded timeout. Reports
+are generated on demand and are not emailed, published, or persisted by this MVP
+endpoint.
+
 ## Agent tools
 
 Agent tools are application-layer functions whose execution rules remain under
@@ -246,15 +263,21 @@ similarity threshold, or embedding vector.
   sized preceding window. It returns only clusters whose report volume grew,
   ordered by absolute increase, with current/previous counts, delta, percentage
   growth, priority, and an explicit marker for newly appearing issues.
+- `GenerateReportTool` orchestrates `GetFeedbackStatisticsTool` and
+  `GetTrendingIssuesTool`, sends only aggregate metrics to the AI provider, and
+  validates a strict bounded result. Quantitative source data remains
+  deterministic; the model supplies only the narrative synthesis and grounded
+  engineering recommendations.
 
 The existing `GET /api/feedback/{id}/similar` endpoint delegates to the same
 search tool, keeping API and future agent behavior consistent.
 
 ## AI intelligence foundation
 
-`ILLMClient` defines provider-independent structured analysis, embedding, and
-customer-response drafting boundaries. The analysis result contains category,
-component, severity, sentiment, summary, suggested action, and confidence.
+`ILLMClient` defines provider-independent structured analysis, embedding,
+customer-response drafting, and product-report generation boundaries. The
+analysis result contains category, component, severity, sentiment, summary,
+suggested action, and confidence.
 Application validation and domain invariants
 reject unsupported enum values, severity outside 1–5, confidence outside 0–1,
 and empty or oversized text before persistence.

@@ -241,5 +241,12 @@ public sealed class Sprint2AcceptanceTests(PostgreSqlFixture database)
         {
             throw new NotSupportedException();
         }
+
+        public Task<ProductReportResult> GenerateReportAsync(
+            ProductReportRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

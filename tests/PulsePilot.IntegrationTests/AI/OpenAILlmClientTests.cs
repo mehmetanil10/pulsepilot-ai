@@ -41,6 +41,18 @@ public sealed class OpenAILlmClientTests
           "content": "We're sorry you're experiencing this payment issue. Our team is reviewing the report."
         }
         """;
+    private const string SuccessfulProductReport = """
+        {
+          "title": "Weekly Product Intelligence Report",
+          "executiveSummary": "Payment failures were the highest-priority issue this week.",
+          "keyInsights": [
+            "Payment failures increased from 2 to 7 reports."
+          ],
+          "recommendedEngineeringPriorities": [
+            "Investigate the P1 payment cluster first."
+          ]
+        }
+        """;
 
     [Fact]
     public async Task AnalyzeFeedbackAsync_SendsStrictSchemaAndReturnsValidatedResult()
@@ -279,6 +291,54 @@ public sealed class OpenAILlmClientTests
     }
 
     [Fact]
+    public async Task GenerateReportAsync_SendsOnlyAggregateMetricsWithStrictSchema()
+    {
+        string? requestBody = null;
+        var client = CreateClient(async (request, cancellationToken) =>
+        {
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateJsonResponse(CreateResponseJson(
+                "completed",
+                "output_text",
+                SuccessfulProductReport));
+        });
+
+        var result = await client.GenerateReportAsync(CreateReportRequest());
+
+        Assert.Equal("Weekly Product Intelligence Report", result.Title);
+        Assert.Single(result.KeyInsights);
+        Assert.Single(result.RecommendedEngineeringPriorities);
+        Assert.NotNull(requestBody);
+
+        using var requestDocument = JsonDocument.Parse(requestBody);
+        var root = requestDocument.RootElement;
+        var format = root.GetProperty("text").GetProperty("format");
+        var schema = format.GetProperty("schema");
+        var inputText = root
+            .GetProperty("input")[0]
+            .GetProperty("content")[0]
+            .GetProperty("text")
+            .GetString();
+
+        Assert.Equal("product_report", format.GetProperty("name").GetString());
+        Assert.True(format.GetProperty("strict").GetBoolean());
+        Assert.False(schema.GetProperty("additionalProperties").GetBoolean());
+        Assert.Equal(4, schema.GetProperty("required").GetArrayLength());
+        Assert.Equal(
+            ProductReportResult.MaxListItemCount,
+            schema.GetProperty("properties")
+                .GetProperty("keyInsights")
+                .GetProperty("maxItems")
+                .GetInt32());
+        Assert.Contains("untrusted aggregate metrics JSON", inputText, StringComparison.Ordinal);
+        Assert.Contains("Payments", inputText, StringComparison.Ordinal);
+        Assert.Contains("\"totalFeedbackCount\":10", inputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Payment failures", inputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("customer@example.com", requestBody, StringComparison.Ordinal);
+        Assert.DoesNotContain("integration-test-api-key", requestBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task GenerateEmbeddingAsync_SendsDimensionsAndReturnsValidatedVector()
     {
         string? requestBody = null;
@@ -431,7 +491,8 @@ public sealed class OpenAILlmClientTests
             embeddingClient,
             options,
             new FeedbackAnalysisResultValidator(),
-            new CustomerResponseDraftResultValidator());
+            new CustomerResponseDraftResultValidator(),
+            new ProductReportResultValidator());
     }
 
     private static FeedbackAnalysisRequest CreateRequest()
@@ -454,6 +515,34 @@ public sealed class OpenAILlmClientTests
             4,
             FeedbackSentiment.Negative,
             "The customer cannot add a payment card after the latest update.");
+    }
+
+    private static ProductReportRequest CreateReportRequest()
+    {
+        var toExclusive = new DateTimeOffset(2026, 8, 13, 12, 0, 0, TimeSpan.Zero);
+
+        return new ProductReportRequest(
+            toExclusive.AddDays(-7),
+            toExclusive,
+            7,
+            10,
+            8,
+            3.75m,
+            [new ProductReportBreakdownItem("Bug", 8)],
+            [new ProductReportBreakdownItem("Payments", 8)],
+            [new ProductReportBreakdownItem("Negative", 8)],
+            [
+                new ProductReportTrendingIssue(
+                    "Bug",
+                    "Payments",
+                    "P1",
+                    90m,
+                    7,
+                    2,
+                    5,
+                    250m,
+                    false),
+            ]);
     }
 
     private static HttpResponseMessage CreateJsonResponse(

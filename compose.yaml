@@ -39,6 +39,13 @@ x-api-environment: &api-environment
   CustomerResponseDrafting__MaxAttempts: ${CUSTOMER_RESPONSE_DRAFT_MAX_ATTEMPTS:-2}
   CustomerResponseDrafting__TimeoutSeconds: ${CUSTOMER_RESPONSE_DRAFT_TIMEOUT_SECONDS:-30}
   CustomerResponseDrafting__RetryDelayMilliseconds: ${CUSTOMER_RESPONSE_DRAFT_RETRY_DELAY_MS:-250}
+  ReportGeneration__DefaultPeriodDays: ${REPORT_GENERATION_DEFAULT_PERIOD_DAYS:-7}
+  ReportGeneration__MaxPeriodDays: ${REPORT_GENERATION_MAX_PERIOD_DAYS:-90}
+  ReportGeneration__DefaultTrendingIssueLimit: ${REPORT_GENERATION_DEFAULT_TREND_LIMIT:-5}
+  ReportGeneration__MaxTrendingIssueLimit: ${REPORT_GENERATION_MAX_TREND_LIMIT:-10}
+  ReportGeneration__MaxAttempts: ${REPORT_GENERATION_MAX_ATTEMPTS:-2}
+  ReportGeneration__TimeoutSeconds: ${REPORT_GENERATION_TIMEOUT_SECONDS:-30}
+  ReportGeneration__RetryDelayMilliseconds: ${REPORT_GENERATION_RETRY_DELAY_MS:-250}
   PriorityScoring__SeverityWeight: ${PRIORITY_SEVERITY_WEIGHT:-0.35}
   PriorityScoring__FrequencyWeight: ${PRIORITY_FREQUENCY_WEIGHT:-0.30}
   PriorityScoring__CustomerImpactWeight: ${PRIORITY_CUSTOMER_IMPACT_WEIGHT:-0.20}

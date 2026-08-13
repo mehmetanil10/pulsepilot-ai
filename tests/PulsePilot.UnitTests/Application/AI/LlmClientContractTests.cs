@@ -93,5 +93,12 @@ public sealed class LlmClientContractTests
         {
             throw new NotSupportedException();
         }
+
+        public Task<ProductReportResult> GenerateReportAsync(
+            ProductReportRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

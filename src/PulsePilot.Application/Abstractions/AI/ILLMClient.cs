@@ -15,4 +15,8 @@ public interface ILLMClient
     Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
         CustomerResponseDraftRequest request,
         CancellationToken cancellationToken = default);
+
+    Task<ProductReportResult> GenerateReportAsync(
+        ProductReportRequest request,
+        CancellationToken cancellationToken = default);
 }

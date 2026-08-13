@@ -489,6 +489,13 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
 
             return Task.FromResult(new CustomerResponseDraftResult(DraftContent));
         }
+
+        public Task<ProductReportResult> GenerateReportAsync(
+            ProductReportRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class FailingCustomerResponseLlmClient : ILLMClient
@@ -521,6 +528,13 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
                 LlmProviderFailureKind.ProviderUnavailable,
                 "The AI provider is temporarily unavailable.",
                 isTransient: true);
+        }
+
+        public Task<ProductReportResult> GenerateReportAsync(
+            ProductReportRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
         }
     }
 }

@@ -113,6 +113,45 @@ public static class DependencyInjection
                 $"Customer response drafting retry delay must be between 0 and {CustomerResponseDraftingOptions.MaximumAllowedRetryDelayMilliseconds} milliseconds.")
             .ValidateOnStart();
 
+        services.AddOptions<ReportGenerationOptions>()
+            .Bind(configuration.GetSection(ReportGenerationOptions.SectionName))
+            .Validate(
+                options => options.DefaultPeriodDays is >= 1
+                    and <= ReportGenerationOptions.MaximumAllowedPeriodDays,
+                $"Report generation default period must be between 1 and {ReportGenerationOptions.MaximumAllowedPeriodDays} days.")
+            .Validate(
+                options => options.MaxPeriodDays is >= 1
+                    and <= ReportGenerationOptions.MaximumAllowedPeriodDays,
+                $"Report generation maximum period must be between 1 and {ReportGenerationOptions.MaximumAllowedPeriodDays} days.")
+            .Validate(
+                options => options.DefaultPeriodDays <= options.MaxPeriodDays,
+                "Report generation default period cannot exceed its maximum period.")
+            .Validate(
+                options => options.DefaultTrendingIssueLimit is >= 1
+                    and <= ReportGenerationOptions.MaximumAllowedTrendingIssueLimit,
+                $"Report generation default trend limit must be between 1 and {ReportGenerationOptions.MaximumAllowedTrendingIssueLimit}.")
+            .Validate(
+                options => options.MaxTrendingIssueLimit is >= 1
+                    and <= ReportGenerationOptions.MaximumAllowedTrendingIssueLimit,
+                $"Report generation maximum trend limit must be between 1 and {ReportGenerationOptions.MaximumAllowedTrendingIssueLimit}.")
+            .Validate(
+                options => options.DefaultTrendingIssueLimit
+                    <= options.MaxTrendingIssueLimit,
+                "Report generation default trend limit cannot exceed its maximum limit.")
+            .Validate(
+                options => options.MaxAttempts is >= 1
+                    and <= ReportGenerationOptions.MaximumAllowedAttempts,
+                $"Report generation attempts must be between 1 and {ReportGenerationOptions.MaximumAllowedAttempts}.")
+            .Validate(
+                options => options.TimeoutSeconds is >= 1
+                    and <= ReportGenerationOptions.MaximumAllowedTimeoutSeconds,
+                $"Report generation timeout must be between 1 and {ReportGenerationOptions.MaximumAllowedTimeoutSeconds} seconds.")
+            .Validate(
+                options => options.RetryDelayMilliseconds is >= 0
+                    and <= ReportGenerationOptions.MaximumAllowedRetryDelayMilliseconds,
+                $"Report generation retry delay must be between 0 and {ReportGenerationOptions.MaximumAllowedRetryDelayMilliseconds} milliseconds.")
+            .ValidateOnStart();
+
         services.AddOptions<TrendingIssuesOptions>()
             .Bind(configuration.GetSection(TrendingIssuesOptions.SectionName))
             .Validate(

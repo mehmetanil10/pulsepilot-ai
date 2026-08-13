@@ -542,6 +542,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
         {
             throw new NotSupportedException();
         }
+
+        public Task<ProductReportResult> GenerateReportAsync(
+            ProductReportRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class BlockingLlmClient : ILLMClient
@@ -582,6 +589,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
         {
             throw new NotSupportedException();
         }
+
+        public Task<ProductReportResult> GenerateReportAsync(
+            ProductReportRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private sealed class TimeoutLlmClient : ILLMClient
@@ -611,6 +625,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
 
         public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
             CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<ProductReportResult> GenerateReportAsync(
+            ProductReportRequest request,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
@@ -655,6 +676,13 @@ public sealed class FeedbackAnalysisProcessorTests(PostgreSqlFixture database)
 
         public Task<CustomerResponseDraftResult> GenerateResponseDraftAsync(
             CustomerResponseDraftRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<ProductReportResult> GenerateReportAsync(
+            ProductReportRequest request,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
