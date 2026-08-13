@@ -35,6 +35,11 @@ supports status filters and pagination, and exposes approve/reject controls only
 to workspace admins. Every decision uses the same-origin API gateway; approval
 can invoke only the backend tool already assigned to that recommendation.
 
+The engineering backlog provides a read-only workspace view of approved issue
+recommendations. It supports lifecycle, priority, and source-action filters,
+keeps pagination server-rendered, and links executed engineering actions back to
+the exact backlog item they created.
+
 ## Checks
 
 ```powershell

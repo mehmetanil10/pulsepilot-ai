@@ -145,12 +145,22 @@ function PendingActionCard({ action, canReview }: { action: PendingActionItem; c
         {action.status === "pending" ? (
           <ActionReviewControls actionId={action.id} actionType={action.actionType} canReview={canReview} />
         ) : (
-          <div className="action-decision-summary">
-            <Icon name={action.status === "rejected" || action.status === "failed" ? "alert" : "actions"} />
-            <span>
-              <strong>{decisionSummary(action.status)}</strong>
-              <small>{decisionAt ? formatDateTime(decisionAt) : `Last updated ${formatDateTime(action.updatedAt)}`}</small>
-            </span>
+          <div className="action-decision-row">
+            <div className="action-decision-summary">
+              <Icon name={action.status === "rejected" || action.status === "failed" ? "alert" : "actions"} />
+              <span>
+                <strong>{decisionSummary(action.status)}</strong>
+                <small>{decisionAt ? formatDateTime(decisionAt) : `Last updated ${formatDateTime(action.updatedAt)}`}</small>
+              </span>
+            </div>
+            {action.status === "executed" && action.actionType === "createEngineeringIssue" && (
+              <Link
+                className="action-backlog-link"
+                href={`/backlog?sourcePendingActionId=${action.id}`}
+              >
+                View backlog item <Icon name="arrow" />
+              </Link>
+            )}
           </div>
         )}
       </footer>
