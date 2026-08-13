@@ -17,7 +17,9 @@ KPIs, trending issue momentum, processing health, recent feedback, pending AI
 actions, and category distribution. Its searchable feedback library links to a
 responsive detail experience that combines the original signal, AI summary,
 structured metrics, processing information, cluster context, suggested action,
-and semantic matches without exposing customer identity fields. The AI
+and semantic matches without exposing customer identity fields. Its human review
+queue presents recommendation evidence and keeps approve/reject decisions behind
+workspace-admin authorization. The AI
 intelligence foundation now includes provider-independent structured analysis
 contracts, a persisted `FeedbackAnalysis` model, an OpenAI Responses API adapter
 with strict Structured Outputs, and pgvector-backed feedback embeddings. A
@@ -141,6 +143,12 @@ Each `/feedback/{id}` web route loads the original feedback and independently
 aggregates analysis, cluster, and semantic-match data. Expected pending and stale
 analysis states are rendered explicitly, while an unavailable auxiliary section
 does not prevent the original signal from being inspected.
+
+`GET /api/actions` powers the server-rendered `/actions` review queue. The page
+supports status filters and pagination, projects only bounded recommendation
+context from the action payload, and links each recommendation to its source
+feedback. Approve/reject mutations pass through the same-origin frontend gateway;
+the API remains the authorization and idempotency boundary.
 
 ## Demo seed data
 

@@ -30,6 +30,11 @@ The detail route combines the original signal, current or stale AI analysis,
 processing state, associated cluster, suggested action, and semantic matches.
 Auxiliary failures are isolated so the original feedback remains readable.
 
+The action review queue loads workspace-scoped recommendations on the server,
+supports status filters and pagination, and exposes approve/reject controls only
+to workspace admins. Every decision uses the same-origin API gateway; approval
+can invoke only the backend tool already assigned to that recommendation.
+
 ## Checks
 
 ```powershell
