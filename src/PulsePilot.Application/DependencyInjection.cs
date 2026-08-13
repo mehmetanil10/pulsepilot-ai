@@ -1,7 +1,9 @@
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.Actions;
+using PulsePilot.Application.Agents;
 using PulsePilot.Application.Authentication;
 using PulsePilot.Application.Backlog;
 using PulsePilot.Application.CustomerResponses;
@@ -20,6 +22,7 @@ public static class DependencyInjection
     {
         services.AddValidatorsFromAssemblyContaining(typeof(DependencyInjection));
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IAgentOrchestrator, AgentOrchestrator>();
         services.AddScoped<IBacklogItemService, BacklogItemService>();
         services.AddScoped<ICustomerResponseDraftService, CustomerResponseDraftService>();
         services.AddScoped<IWeeklyReportService, WeeklyReportService>();
@@ -35,6 +38,10 @@ public static class DependencyInjection
         services.AddScoped<IFeedbackClusterService, FeedbackClusterService>();
         services.AddScoped<IFeedbackAnalysisProcessor, FeedbackAnalysisProcessor>();
         services.AddSingleton<IPriorityScoreCalculator, PriorityScoreCalculator>();
+        services.TryAddScoped<IAgentTurnClient, UnavailableAgentTurnClient>();
+        services.TryAddSingleton<IAgentToolCatalog, EmptyAgentToolCatalog>();
+        services.TryAddScoped<IAgentToolExecutor, DisabledAgentToolExecutor>();
+        services.AddOptions<AgentOrchestrationOptions>();
         services.AddOptions<FeedbackProcessingOptions>();
         services.AddOptions<CustomerResponseDraftingOptions>();
         services.AddOptions<ReportGenerationOptions>();

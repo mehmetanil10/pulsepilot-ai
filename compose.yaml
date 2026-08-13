@@ -46,6 +46,14 @@ x-api-environment: &api-environment
   ReportGeneration__MaxAttempts: ${REPORT_GENERATION_MAX_ATTEMPTS:-2}
   ReportGeneration__TimeoutSeconds: ${REPORT_GENERATION_TIMEOUT_SECONDS:-30}
   ReportGeneration__RetryDelayMilliseconds: ${REPORT_GENERATION_RETRY_DELAY_MS:-250}
+  AgentOrchestration__MaxTurns: ${AGENT_MAX_TURNS:-6}
+  AgentOrchestration__MaxToolCallsPerTurn: ${AGENT_MAX_TOOL_CALLS_PER_TURN:-4}
+  AgentOrchestration__MaxTotalToolCalls: ${AGENT_MAX_TOTAL_TOOL_CALLS:-12}
+  AgentOrchestration__ExecutionTimeoutSeconds: ${AGENT_EXECUTION_TIMEOUT_SECONDS:-90}
+  AgentOrchestration__MaxUserMessageLength: ${AGENT_MAX_USER_MESSAGE_LENGTH:-4000}
+  AgentOrchestration__MaxFinalAnswerLength: ${AGENT_MAX_FINAL_ANSWER_LENGTH:-8000}
+  AgentOrchestration__MaxToolArgumentsLength: ${AGENT_MAX_TOOL_ARGUMENTS_LENGTH:-8000}
+  AgentOrchestration__MaxToolOutputLength: ${AGENT_MAX_TOOL_OUTPUT_LENGTH:-20000}
   PriorityScoring__SeverityWeight: ${PRIORITY_SEVERITY_WEIGHT:-0.35}
   PriorityScoring__FrequencyWeight: ${PRIORITY_FREQUENCY_WEIGHT:-0.30}
   PriorityScoring__CustomerImpactWeight: ${PRIORITY_CUSTOMER_IMPACT_WEIGHT:-0.20}

@@ -13,6 +13,7 @@ using OpenAI;
 using OpenAI.Embeddings;
 using OpenAI.Responses;
 using PulsePilot.Application;
+using PulsePilot.Application.Agents;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
 using PulsePilot.Application.Prioritization;
@@ -444,6 +445,29 @@ public sealed class OpenAILlmClientTests
 
         Assert.Throws<OptionsValidationException>(() =>
             serviceProvider.GetRequiredService<IOptions<PriorityScoringOptions>>().Value);
+    }
+
+    [Fact]
+    public void AgentOrchestrationOptions_RejectUnsafeToolCallBudgets()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ConnectionStrings:Database"] =
+                    "Host=localhost;Database=pulsepilot;Username=pulsepilot",
+                ["AgentOrchestration:MaxToolCallsPerTurn"] = "5",
+                ["AgentOrchestration:MaxTotalToolCalls"] = "4",
+            })
+            .Build();
+        using var serviceProvider = new ServiceCollection()
+            .AddApplication()
+            .AddInfrastructure(configuration)
+            .BuildServiceProvider();
+
+        Assert.Throws<OptionsValidationException>(() =>
+            serviceProvider
+                .GetRequiredService<IOptions<AgentOrchestrationOptions>>()
+                .Value);
     }
 
     private static OpenAILlmClient CreateClient(

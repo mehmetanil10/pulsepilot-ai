@@ -13,6 +13,7 @@ using Pgvector.EntityFrameworkCore;
 using PulsePilot.Application.Abstractions.AI;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Application.Agents;
 using PulsePilot.Application.Feedback;
 using PulsePilot.Application.Prioritization;
 using PulsePilot.Application.Tools;
@@ -63,6 +64,45 @@ public static class DependencyInjection
 
         services.Configure<DemoSeedOptions>(
             configuration.GetSection(DemoSeedOptions.SectionName));
+
+        services.AddOptions<AgentOrchestrationOptions>()
+            .Bind(configuration.GetSection(AgentOrchestrationOptions.SectionName))
+            .Validate(
+                options => options.MaxTurns is >= 1
+                    and <= AgentOrchestrationOptions.MaximumAllowedTurns,
+                $"Agent maximum turns must be between 1 and {AgentOrchestrationOptions.MaximumAllowedTurns}.")
+            .Validate(
+                options => options.MaxToolCallsPerTurn is >= 1
+                    and <= AgentOrchestrationOptions.MaximumAllowedToolCallsPerTurn,
+                $"Agent tool calls per turn must be between 1 and {AgentOrchestrationOptions.MaximumAllowedToolCallsPerTurn}.")
+            .Validate(
+                options => options.MaxTotalToolCalls is >= 1
+                    and <= AgentOrchestrationOptions.MaximumAllowedTotalToolCalls,
+                $"Agent total tool calls must be between 1 and {AgentOrchestrationOptions.MaximumAllowedTotalToolCalls}.")
+            .Validate(
+                options => options.MaxToolCallsPerTurn <= options.MaxTotalToolCalls,
+                "Agent tool calls per turn cannot exceed its total tool-call budget.")
+            .Validate(
+                options => options.ExecutionTimeoutSeconds is >= 1
+                    and <= AgentOrchestrationOptions.MaximumAllowedTimeoutSeconds,
+                $"Agent execution timeout must be between 1 and {AgentOrchestrationOptions.MaximumAllowedTimeoutSeconds} seconds.")
+            .Validate(
+                options => options.MaxUserMessageLength is >= 1
+                    and <= AgentOrchestrationOptions.MaximumAllowedUserMessageLength,
+                $"Agent user message length must be between 1 and {AgentOrchestrationOptions.MaximumAllowedUserMessageLength}.")
+            .Validate(
+                options => options.MaxFinalAnswerLength is >= 1
+                    and <= AgentOrchestrationOptions.MaximumAllowedFinalAnswerLength,
+                $"Agent final answer length must be between 1 and {AgentOrchestrationOptions.MaximumAllowedFinalAnswerLength}.")
+            .Validate(
+                options => options.MaxToolArgumentsLength is >= 2
+                    and <= AgentOrchestrationOptions.MaximumAllowedToolArgumentsLength,
+                $"Agent tool arguments length must be between 2 and {AgentOrchestrationOptions.MaximumAllowedToolArgumentsLength}.")
+            .Validate(
+                options => options.MaxToolOutputLength is >= 1
+                    and <= AgentOrchestrationOptions.MaximumAllowedToolOutputLength,
+                $"Agent tool output length must be between 1 and {AgentOrchestrationOptions.MaximumAllowedToolOutputLength}.")
+            .ValidateOnStart();
 
         services.AddOptions<SemanticSearchOptions>()
             .Bind(configuration.GetSection(SemanticSearchOptions.SectionName))

@@ -24,7 +24,9 @@ actions generate persisted, unsent drafts through `DraftCustomerResponseTool`.
 `SearchSimilarFeedbackTool` exposes workspace-scoped semantic retrieval for the
 upcoming agent orchestrator. `GenerateReportTool` now combines deterministic
 workspace statistics and trends with a strictly validated AI narrative for
-on-demand weekly product intelligence reports. EF Core migrations and
+on-demand weekly product intelligence reports. A provider-neutral agent
+orchestration runtime now supports bounded multi-turn execution while keeping
+workspace identity under backend control. EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
 
@@ -271,6 +273,26 @@ similarity threshold, or embedding vector.
 
 The existing `GET /api/feedback/{id}/similar` endpoint delegates to the same
 search tool, keeping API and future agent behavior consistent.
+
+## Agent orchestration
+
+The application layer contains a provider-neutral `IAgentOrchestrator` and
+`IAgentTurnClient` boundary. The orchestrator keeps the original user message,
+allowlisted tool definitions, and validated tool exchanges across turns. The
+trusted workspace identifier is supplied only to the backend tool executor and
+is never included in the provider turn request.
+
+Execution is bounded by configurable maximum turns, calls per turn, total tool
+calls, argument/output sizes, final-answer size, and an overall timeout. Tool
+names must match the backend catalog, call identifiers must be unique, and every
+argument payload and schema must be a JSON object. Invalid provider turns fail
+closed before any calls in that turn execute. The final turn cannot execute a
+tool because no turn would remain to synthesize a user-facing answer.
+
+Task 24 intentionally ships with an empty tool catalog and an unavailable agent
+turn client, so the runtime cannot accidentally invoke tools before the Task 25
+tool-calling adapter and allowlist are connected. The Copilot HTTP endpoint will
+be added separately after that runtime is available.
 
 ## AI intelligence foundation
 
