@@ -240,6 +240,26 @@ tool retries only transient provider failures with a bounded timeout. Reports
 are generated on demand and are not emailed, published, or persisted by this MVP
 endpoint.
 
+## Copilot API
+
+Authenticated workspace members can ask natural-language questions through the
+agent runtime:
+
+- `POST /api/copilot/chat`
+
+The request body contains only a required `message`; workspace context is derived
+from validated JWT claims and cannot be selected by the client. Message length is
+bounded by `AgentOrchestration:MaxUserMessageLength`. A successful response
+contains the grounded answer, model-turn count, tool-call count, and a safe tool
+usage summary containing only the tool name and success state. Provider call IDs,
+tool arguments, raw protocol history, and workspace identifiers are not exposed.
+
+The endpoint can invoke only the four analytical tools in the backend allowlist.
+It cannot create backlog items, approve actions, or send customer responses.
+Invalid requests return `400`, anonymous requests return `401`, invalid provider
+output returns `502`, and unavailable or disabled providers return a generic `503`
+Problem Details response.
+
 ## Agent tools
 
 Agent tools are application-layer functions whose execution rules remain under
@@ -310,7 +330,8 @@ function outputs, and encrypted reasoning state in order, and wraps every tool
 result with an explicit success marker. Its instructions treat user and tool
 content as untrusted data and prohibit claims of side effects. Provider transport,
 status, refusal, and timeout mapping is shared by structured AI calls and agent
-turns. The authenticated Copilot HTTP endpoint remains a separate next task.
+turns. The authenticated Copilot endpoint maps the token workspace into this
+runtime and returns only a safe answer and tool-usage summary.
 
 ## AI intelligence foundation
 

@@ -6,6 +6,7 @@ using PulsePilot.Application.Actions;
 using PulsePilot.Application.Agents;
 using PulsePilot.Application.Authentication;
 using PulsePilot.Application.Backlog;
+using PulsePilot.Application.Copilot;
 using PulsePilot.Application.CustomerResponses;
 using PulsePilot.Application.Feedback;
 using PulsePilot.Application.FeedbackClusters;
@@ -25,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentOrchestrator, AgentOrchestrator>();
         services.AddScoped<IBacklogItemService, BacklogItemService>();
         services.AddScoped<ICustomerResponseDraftService, CustomerResponseDraftService>();
+        services.AddScoped<ICopilotChatService, CopilotChatService>();
         services.AddScoped<IWeeklyReportService, WeeklyReportService>();
         services.AddScoped<IPendingActionService, PendingActionService>();
         services.AddScoped<IPendingActionRecommender, PendingActionRecommender>();
