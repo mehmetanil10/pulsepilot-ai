@@ -6,19 +6,22 @@ issues, and keep critical actions behind human approval.
 
 ## Current status
 
-Sprint 1 and Sprint 2 are complete, and Sprint 3 is in progress. The .NET 10 Clean Architecture
-foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
+Sprint 1 and Sprint 2 are complete, and Sprint 3 is in progress. The .NET 10
+Clean Architecture foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, idempotent demo seed, and a Next.js 16 App Router frontend foundation are
 ready. The web app includes a responsive product shell, login and registration
 flows, HttpOnly JWT sessions, an allowlisted same-origin API gateway, and a
 standalone production container. Its live dashboard now presents workspace-scoped
 KPIs, trending issue momentum, processing health, recent feedback, pending AI
-actions, and category distribution. The AI intelligence foundation now
-includes provider-independent structured analysis contracts, a persisted
-`FeedbackAnalysis` model, an OpenAI Responses API adapter with strict Structured
-Outputs, and pgvector-backed feedback embeddings. A separate database-backed
-worker now claims pending feedback with expiring leases, retries transient
+actions, and category distribution. Its searchable feedback library links to a
+responsive detail experience that combines the original signal, AI summary,
+structured metrics, processing information, cluster context, suggested action,
+and semantic matches without exposing customer identity fields. The AI
+intelligence foundation now includes provider-independent structured analysis
+contracts, a persisted `FeedbackAnalysis` model, an OpenAI Responses API adapter
+with strict Structured Outputs, and pgvector-backed feedback embeddings. A
+separate database-backed worker now claims pending feedback with expiring leases, retries transient
 failures, and atomically persists analysis plus embedding without holding a
 transaction during either AI call. Cosine similarity search is workspace-scoped,
 and category/component-aware cluster assignment groups related reports safely
@@ -134,6 +137,10 @@ The frontend validates both API response shapes before rendering and supports
 query supports source, processing status, category, component, severity,
 sentiment, inclusive date ranges, title/content search, and pagination. List
 responses include a compact AI-analysis projection without customer PII.
+Each `/feedback/{id}` web route loads the original feedback and independently
+aggregates analysis, cluster, and semantic-match data. Expected pending and stale
+analysis states are rendered explicitly, while an unavailable auxiliary section
+does not prevent the original signal from being inspected.
 
 ## Demo seed data
 

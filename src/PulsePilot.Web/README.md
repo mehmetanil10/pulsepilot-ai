@@ -26,6 +26,9 @@ always uncached so workspace metrics reflect the current backend state.
 The feedback library uses the same server-only session path. It supports
 workspace-scoped search, source, processing status, AI category, component,
 severity, sentiment, date filters, and paginated links to feedback detail.
+The detail route combines the original signal, current or stale AI analysis,
+processing state, associated cluster, suggested action, and semantic matches.
+Auxiliary failures are isolated so the original feedback remains readable.
 
 ## Checks
 

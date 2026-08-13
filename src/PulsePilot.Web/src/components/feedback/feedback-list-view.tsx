@@ -12,6 +12,10 @@ import {
   countActiveFeedbackFilters,
   feedbackHref,
 } from "@/lib/feedback/query";
+import {
+  displayFeedbackValue,
+  formatFeedbackDateTime,
+} from "@/lib/feedback/presentation";
 import type {
   FeedbackListFilters,
   FeedbackListItem,
@@ -174,11 +178,11 @@ function FeedbackRow({ item }: { item: FeedbackListItem }) {
       <div className="feedback-signal-copy">
         <strong>{item.title || "Untitled feedback"}</strong>
         <p>{item.content}</p>
-        <small>{formatDateTime(item.createdAt)}</small>
+        <small>{formatFeedbackDateTime(item.createdAt)}</small>
       </div>
       <div className="feedback-analysis-cell">
         {item.category ? (
-          <><strong>{displayName(item.category)}</strong><small>{displayName(item.component ?? "general")} · {displayName(item.sentiment ?? "neutral")}</small></>
+          <><strong>{displayFeedbackValue(item.category)}</strong><small>{displayFeedbackValue(item.component ?? "general")} · {displayFeedbackValue(item.sentiment ?? "neutral")}</small></>
         ) : (
           <><strong>Awaiting analysis</strong><small>AI metadata pending</small></>
         )}
@@ -188,8 +192,8 @@ function FeedbackRow({ item }: { item: FeedbackListItem }) {
           <><span>{item.severity}/5</span><i>{[1, 2, 3, 4, 5].map((level) => <b className={level <= item.severity! ? "filled" : undefined} key={level} />)}</i></>
         ) : <span className="not-available">—</span>}
       </div>
-      <span className="source-chip">{displayName(item.source)}</span>
-      <span className={`feedback-status-chip ${item.processingStatus}`}>{displayName(item.processingStatus)}</span>
+      <span className="source-chip">{displayFeedbackValue(item.source)}</span>
+      <span className={`feedback-status-chip ${item.processingStatus}`}>{displayFeedbackValue(item.processingStatus)}</span>
       <Icon name="arrow" />
     </Link>
   );
@@ -204,23 +208,6 @@ function paginationWindow(current: number, total: number): Array<number | "…">
   if (current <= 4) return [1, 2, 3, 4, 5, "…", total];
   if (current >= total - 3) return [1, "…", total - 4, total - 3, total - 2, total - 1, total];
   return [1, "…", current - 1, current, current + 1, "…", total];
-}
-
-function displayName(value: string): string {
-  if (value.toLowerCase() === "api") return "API";
-  return value.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (letter) => letter.toUpperCase());
-}
-
-function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "UTC",
-    timeZoneName: "short",
-  }).format(new Date(value));
 }
 
 function formatNumber(value: number): string {
