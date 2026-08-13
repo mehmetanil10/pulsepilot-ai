@@ -18,7 +18,9 @@ failures, and atomically persists analysis plus embedding without holding a
 transaction during either AI call. Cosine similarity search is workspace-scoped,
 and category/component-aware cluster assignment groups related reports safely
 across concurrent worker replicas. High-priority clusters now produce durable,
-human-reviewable `PendingAction` recommendations without executing side effects.
+human-reviewable `PendingAction` recommendations. Approved engineering actions
+execute the controlled `CreateBacklogItemTool`, while `SearchSimilarFeedbackTool`
+exposes workspace-scoped semantic retrieval for the upcoming agent orchestrator.
 EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
@@ -206,6 +208,23 @@ Each backlog item records its source cluster, source pending action, approving
 user, priority, and lifecycle status. New tool-created items start as `Open`.
 Cross-workspace identifiers return `404`; list filters cannot expose another
 workspace's records.
+
+## Agent tools
+
+Agent tools are application-layer functions whose execution rules remain under
+backend control. Tool inputs do not allow the model to supply a workspace,
+similarity threshold, or embedding vector.
+
+- `CreateBacklogItemTool` executes only an approved engineering action and is
+  idempotent for repeated approvals.
+- `SearchSimilarFeedbackTool` accepts a source feedback identifier and an
+  optional bounded result limit. The orchestrator supplies the trusted workspace
+  context, while the backend applies the configured similarity threshold and
+  returns only completed, non-deleted matches. The source embedding must still
+  match the feedback's current title and content.
+
+The existing `GET /api/feedback/{id}/similar` endpoint delegates to the same
+search tool, keeping API and future agent behavior consistent.
 
 ## AI intelligence foundation
 

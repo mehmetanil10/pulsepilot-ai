@@ -22,6 +22,7 @@ public static class DependencyInjection
         services.AddScoped<IPendingActionService, PendingActionService>();
         services.AddScoped<IPendingActionRecommender, PendingActionRecommender>();
         services.AddScoped<ICreateBacklogItemTool, CreateBacklogItemTool>();
+        services.AddScoped<ISearchSimilarFeedbackTool, SearchSimilarFeedbackTool>();
         services.AddScoped<IFeedbackService, FeedbackService>();
         services.AddScoped<IFeedbackClusterService, FeedbackClusterService>();
         services.AddScoped<IFeedbackAnalysisProcessor, FeedbackAnalysisProcessor>();
