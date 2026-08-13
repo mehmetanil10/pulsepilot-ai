@@ -64,6 +64,14 @@ public sealed class GlobalExceptionHandler(
                 StatusCodes.Status404NotFound,
                 "Resource not found",
                 exception.Message),
+            ForbiddenException => CreateKnownProblemDetails(
+                StatusCodes.Status403Forbidden,
+                "Access denied",
+                exception.Message),
+            ConcurrencyConflictException => CreateKnownProblemDetails(
+                StatusCodes.Status409Conflict,
+                "Conflict",
+                exception.Message),
             ConflictException => CreateKnownProblemDetails(
                 StatusCodes.Status409Conflict,
                 "Conflict",

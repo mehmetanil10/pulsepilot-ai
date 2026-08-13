@@ -25,6 +25,12 @@ internal sealed class PendingActionConfiguration : IEntityTypeConfiguration<Pend
                 tableBuilder.HasCheckConstraint(
                     "ck_pending_actions_payload_object",
                     "jsonb_typeof(payload) = 'object'");
+                tableBuilder.HasCheckConstraint(
+                    "ck_pending_actions_review_state",
+                    "(status = 'Pending' AND approved_at IS NULL AND rejected_at IS NULL) "
+                    + "OR (status = 'Approved' AND approved_at IS NOT NULL AND rejected_at IS NULL) "
+                    + "OR (status = 'Rejected' AND approved_at IS NULL AND rejected_at IS NOT NULL) "
+                    + "OR (status IN ('Executed', 'Failed') AND approved_at IS NOT NULL AND rejected_at IS NULL)");
             });
 
         builder.HasKey(pendingAction => pendingAction.Id)
@@ -79,6 +85,7 @@ internal sealed class PendingActionConfiguration : IEntityTypeConfiguration<Pend
             .HasColumnName("status")
             .HasConversion<string>()
             .HasMaxLength(16)
+            .IsConcurrencyToken()
             .IsRequired();
 
         builder.Property(pendingAction => pendingAction.ApprovedAt)

@@ -80,4 +80,39 @@ public sealed class PendingAction : AuditableEntity
             payload,
             createdAt);
     }
+
+    public void Approve(DateTimeOffset approvedAt)
+    {
+        if (Status == PendingActionStatus.Approved)
+        {
+            return;
+        }
+
+        EnsurePending("approved");
+        MarkUpdated(approvedAt);
+        Status = PendingActionStatus.Approved;
+        ApprovedAt = approvedAt.ToUniversalTime();
+    }
+
+    public void Reject(DateTimeOffset rejectedAt)
+    {
+        if (Status == PendingActionStatus.Rejected)
+        {
+            return;
+        }
+
+        EnsurePending("rejected");
+        MarkUpdated(rejectedAt);
+        Status = PendingActionStatus.Rejected;
+        RejectedAt = rejectedAt.ToUniversalTime();
+    }
+
+    private void EnsurePending(string transition)
+    {
+        if (Status != PendingActionStatus.Pending)
+        {
+            throw new DomainException(
+                $"Only pending actions can be {transition}.");
+        }
+    }
 }

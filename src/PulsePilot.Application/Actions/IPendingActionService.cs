@@ -9,4 +9,12 @@ public interface IPendingActionService
     Task<PendingActionResponse> GetByIdAsync(
         Guid pendingActionId,
         CancellationToken cancellationToken = default);
+
+    Task<PendingActionResponse> ApproveAsync(
+        Guid pendingActionId,
+        CancellationToken cancellationToken = default);
+
+    Task<PendingActionResponse> RejectAsync(
+        Guid pendingActionId,
+        CancellationToken cancellationToken = default);
 }

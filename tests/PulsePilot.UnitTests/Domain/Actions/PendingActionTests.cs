@@ -81,4 +81,65 @@ public sealed class PendingActionTests
             " ",
             now));
     }
+
+    [Fact]
+    public void Approve_WhenPending_RecordsDecisionAndIsIdempotent()
+    {
+        var createdAt = DateTimeOffset.UtcNow;
+        var approvedAt = createdAt.AddMinutes(1);
+        var pendingAction = CreatePendingAction(createdAt);
+
+        pendingAction.Approve(approvedAt);
+        pendingAction.Approve(approvedAt.AddMinutes(1));
+
+        Assert.Equal(PendingActionStatus.Approved, pendingAction.Status);
+        Assert.Equal(approvedAt, pendingAction.ApprovedAt);
+        Assert.Null(pendingAction.RejectedAt);
+        Assert.Equal(approvedAt, pendingAction.UpdatedAt);
+    }
+
+    [Fact]
+    public void Reject_WhenPending_RecordsDecisionAndIsIdempotent()
+    {
+        var createdAt = DateTimeOffset.UtcNow;
+        var rejectedAt = createdAt.AddMinutes(1);
+        var pendingAction = CreatePendingAction(createdAt);
+
+        pendingAction.Reject(rejectedAt);
+        pendingAction.Reject(rejectedAt.AddMinutes(1));
+
+        Assert.Equal(PendingActionStatus.Rejected, pendingAction.Status);
+        Assert.Equal(rejectedAt, pendingAction.RejectedAt);
+        Assert.Null(pendingAction.ApprovedAt);
+        Assert.Equal(rejectedAt, pendingAction.UpdatedAt);
+    }
+
+    [Fact]
+    public void Review_AfterOppositeDecision_IsRejectedWithoutMutation()
+    {
+        var createdAt = DateTimeOffset.UtcNow;
+        var approvedAt = createdAt.AddMinutes(1);
+        var pendingAction = CreatePendingAction(createdAt);
+        pendingAction.Approve(approvedAt);
+
+        Assert.Throws<DomainException>(() =>
+            pendingAction.Reject(approvedAt.AddMinutes(1)));
+        Assert.Equal(PendingActionStatus.Approved, pendingAction.Status);
+        Assert.Equal(approvedAt, pendingAction.ApprovedAt);
+        Assert.Null(pendingAction.RejectedAt);
+        Assert.Equal(approvedAt, pendingAction.UpdatedAt);
+    }
+
+    private static PendingAction CreatePendingAction(DateTimeOffset createdAt)
+    {
+        return PendingAction.Create(
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            Guid.CreateVersion7(),
+            PendingActionType.CreateEngineeringIssue,
+            "[P1] Payment failures",
+            "Create an engineering issue.",
+            "{}",
+            createdAt);
+    }
 }

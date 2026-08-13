@@ -169,6 +169,8 @@ Pending-action endpoints require a bearer token and are always workspace-scoped:
 
 - `GET /api/actions?page=1&pageSize=20&status=pending`
 - `GET /api/actions/{id}`
+- `POST /api/actions/{id}/approve` (workspace admin only)
+- `POST /api/actions/{id}/reject` (workspace admin only)
 
 The worker deterministically recommends an action only for `P1` and `P2`
 clusters. Bugs and feature requests create an engineering-issue recommendation,
@@ -179,8 +181,12 @@ payload context and cannot select or execute a tool.
 
 Recommendations are persisted with `Pending` status. A filtered PostgreSQL
 unique index permits only one active (`Pending` or `Approved`) recommendation
-for the same workspace, cluster, and action type. Approval, rejection, and tool
-execution are intentionally deferred to the subsequent human-in-the-loop tasks.
+for the same workspace, cluster, and action type. Workspace admins can explicitly
+approve or reject a pending recommendation. Repeating the same decision is
+idempotent, while an opposite or terminal decision returns `409`. Optimistic
+concurrency and a database review-state constraint ensure concurrent requests
+cannot produce conflicting decisions. Approval records the decision only;
+backlog creation and tool execution remain deferred to the next task.
 
 ## AI intelligence foundation
 

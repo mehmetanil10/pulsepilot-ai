@@ -193,6 +193,7 @@ public sealed class AppDbContextModelTests
 
         Assert.Equal(typeof(string), actionType!.GetTypeMapping().Converter?.ProviderClrType);
         Assert.Equal(typeof(string), status!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.True(status.IsConcurrencyToken);
         Assert.Equal("jsonb", payload!.GetColumnType());
         Assert.True(activeIndex.IsUnique);
         Assert.Equal(

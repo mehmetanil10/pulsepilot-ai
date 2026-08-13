@@ -35,6 +35,17 @@ internal sealed class PendingActionRepository(AppDbContext dbContext)
             cancellationToken);
     }
 
+    public Task<PendingAction?> GetForUpdateAsync(
+        Guid workspaceId,
+        Guid pendingActionId,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.PendingActions.SingleOrDefaultAsync(
+            pendingAction => pendingAction.WorkspaceId == workspaceId
+                && pendingAction.Id == pendingActionId,
+            cancellationToken);
+    }
+
     public async Task<IReadOnlyList<PendingAction>> ListAsync(
         Guid workspaceId,
         PendingActionStatus? status,

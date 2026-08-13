@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PulsePilot.Application.Abstractions.Persistence;
+using PulsePilot.Application.Common.Exceptions;
 using PulsePilot.Domain.Actions;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
@@ -31,6 +32,21 @@ public sealed class AppDbContext : DbContext, IUnitOfWork
     public DbSet<FeedbackCluster> FeedbackClusters => Set<FeedbackCluster>();
 
     public DbSet<PendingAction> PendingActions => Set<PendingAction>();
+
+    public override async Task<int> SaveChangesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException exception)
+        {
+            throw new ConcurrencyConflictException(
+                "The resource was changed by another request.",
+                exception);
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

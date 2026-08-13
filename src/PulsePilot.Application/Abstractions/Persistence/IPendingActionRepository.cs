@@ -9,6 +9,11 @@ public interface IPendingActionRepository
         Guid pendingActionId,
         CancellationToken cancellationToken = default);
 
+    Task<PendingAction?> GetForUpdateAsync(
+        Guid workspaceId,
+        Guid pendingActionId,
+        CancellationToken cancellationToken = default);
+
     Task<PendingAction?> GetActiveByClusterAndTypeAsync(
         Guid workspaceId,
         Guid feedbackClusterId,
