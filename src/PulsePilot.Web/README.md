@@ -40,6 +40,11 @@ recommendations. It supports lifecycle, priority, and source-action filters,
 keeps pagination server-rendered, and links executed engineering actions back to
 the exact backlog item they created.
 
+Workspace Copilot sends bounded natural-language questions through the
+same-origin gateway to the agent orchestration endpoint. Answers expose a safe
+tool-usage trace, preserve only the current browser session visually, and make
+clear that each question is independently grounded in current workspace data.
+
 ## Checks
 
 ```powershell

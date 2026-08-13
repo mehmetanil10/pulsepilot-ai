@@ -10,7 +10,7 @@ const items = [
   { label: "Feedback", href: "/feedback", icon: "feedback" as const, ready: true },
   { label: "Actions", href: "/actions", icon: "actions" as const, ready: true },
   { label: "Backlog", href: "/backlog", icon: "backlog" as const, ready: true },
-  { label: "Copilot", href: "/copilot", icon: "copilot" as const, ready: false },
+  { label: "Copilot", href: "/copilot", icon: "copilot" as const, ready: true },
 ];
 
 export function AppNavigation() {
