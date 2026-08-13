@@ -107,6 +107,23 @@ public sealed class PendingAction : AuditableEntity
         RejectedAt = rejectedAt.ToUniversalTime();
     }
 
+    public void MarkExecuted(DateTimeOffset executedAt)
+    {
+        if (Status == PendingActionStatus.Executed)
+        {
+            return;
+        }
+
+        if (Status != PendingActionStatus.Approved)
+        {
+            throw new DomainException("Only approved actions can be executed.");
+        }
+
+        MarkUpdated(executedAt);
+        Status = PendingActionStatus.Executed;
+        ExecutedAt = executedAt.ToUniversalTime();
+    }
+
     private void EnsurePending(string transition)
     {
         if (Status != PendingActionStatus.Pending)

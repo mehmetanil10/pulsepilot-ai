@@ -185,8 +185,27 @@ for the same workspace, cluster, and action type. Workspace admins can explicitl
 approve or reject a pending recommendation. Repeating the same decision is
 idempotent, while an opposite or terminal decision returns `409`. Optimistic
 concurrency and a database review-state constraint ensure concurrent requests
-cannot produce conflicting decisions. Approval records the decision only;
-backlog creation and tool execution remain deferred to the next task.
+cannot produce conflicting decisions. Approving a `CreateEngineeringIssue`
+recommendation invokes the controlled backend `CreateBacklogItemTool`, creates
+one workspace-scoped backlog item, and atomically advances the action to
+`Executed`. Action-level advisory locking and a unique source-action index make
+concurrent repeated approvals idempotent. A filtered unique index also prevents
+more than one `Open` or `InProgress` backlog item for the same source cluster.
+Action types whose tools are not yet implemented remain `Approved`.
+
+## Backlog API
+
+Backlog endpoints require a bearer token and derive the workspace exclusively
+from validated JWT claims:
+
+- `GET /api/backlog?page=1&pageSize=20&status=open&priority=p1`
+- `GET /api/backlog?sourcePendingActionId={actionId}`
+- `GET /api/backlog/{id}`
+
+Each backlog item records its source cluster, source pending action, approving
+user, priority, and lifecycle status. New tool-created items start as `Open`.
+Cross-workspace identifiers return `404`; list filters cannot expose another
+workspace's records.
 
 ## AI intelligence foundation
 

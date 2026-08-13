@@ -31,6 +31,10 @@ internal sealed class PendingActionConfiguration : IEntityTypeConfiguration<Pend
                     + "OR (status = 'Approved' AND approved_at IS NOT NULL AND rejected_at IS NULL) "
                     + "OR (status = 'Rejected' AND approved_at IS NULL AND rejected_at IS NOT NULL) "
                     + "OR (status IN ('Executed', 'Failed') AND approved_at IS NOT NULL AND rejected_at IS NULL)");
+                tableBuilder.HasCheckConstraint(
+                    "ck_pending_actions_execution_state",
+                    "(status = 'Executed' AND executed_at IS NOT NULL) "
+                    + "OR (status <> 'Executed' AND executed_at IS NULL)");
             });
 
         builder.HasKey(pendingAction => pendingAction.Id)

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Common.Exceptions;
 using PulsePilot.Domain.Actions;
+using PulsePilot.Domain.Backlog;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
@@ -32,6 +33,8 @@ public sealed class AppDbContext : DbContext, IUnitOfWork
     public DbSet<FeedbackCluster> FeedbackClusters => Set<FeedbackCluster>();
 
     public DbSet<PendingAction> PendingActions => Set<PendingAction>();
+
+    public DbSet<BacklogItem> BacklogItems => Set<BacklogItem>();
 
     public override async Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default)

@@ -6,7 +6,8 @@ using PulsePilot.Domain.Feedback;
 namespace PulsePilot.Application.Actions;
 
 internal sealed class PendingActionRecommender(
-    IPendingActionRepository pendingActionRepository) : IPendingActionRecommender
+    IPendingActionRepository pendingActionRepository,
+    IBacklogItemRepository backlogItemRepository) : IPendingActionRecommender
 {
     private static readonly JsonSerializerOptions SerializerOptions = new(
         JsonSerializerDefaults.Web);
@@ -29,6 +30,15 @@ internal sealed class PendingActionRecommender(
             context.Cluster.Priority);
 
         if (!actionType.HasValue)
+        {
+            return null;
+        }
+
+        if (actionType == PendingActionType.CreateEngineeringIssue
+            && await backlogItemRepository.GetActiveBySourceClusterIdAsync(
+                context.Cluster.WorkspaceId,
+                context.Cluster.Id,
+                cancellationToken) is not null)
         {
             return null;
         }

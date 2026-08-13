@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Pgvector.EntityFrameworkCore;
 using PulsePilot.Domain.Actions;
+using PulsePilot.Domain.Backlog;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
@@ -35,6 +36,9 @@ public sealed class AppDbContextModelTests
         Assert.Equal(
             "pending_actions",
             dbContext.Model.FindEntityType(typeof(PendingAction))?.GetTableName());
+        Assert.Equal(
+            "backlog_items",
+            dbContext.Model.FindEntityType(typeof(BacklogItem))?.GetTableName());
     }
 
     [Fact]
@@ -206,6 +210,38 @@ public sealed class AppDbContextModelTests
         Assert.Equal("status IN ('Pending', 'Approved')", activeIndex.GetFilter());
         Assert.All(
             actionEntity.GetForeignKeys(),
+            foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
+    }
+
+    [Fact]
+    public void BacklogItem_UsesStructuredTypesAndWorkspaceScopedSourceAction()
+    {
+        using var dbContext = CreateDbContext();
+        var backlogEntity = dbContext.Model.FindEntityType(typeof(BacklogItem));
+        var priority = backlogEntity?.FindProperty(nameof(BacklogItem.Priority));
+        var status = backlogEntity?.FindProperty(nameof(BacklogItem.Status));
+        var sourceActionIndex = Assert.Single(
+            backlogEntity!.GetIndexes(),
+            index => index.GetDatabaseName()
+                == "ux_backlog_items_workspace_id_source_action_id");
+        var activeClusterIndex = Assert.Single(
+            backlogEntity.GetIndexes(),
+            index => index.GetDatabaseName()
+                == "ux_backlog_items_active_source_cluster");
+
+        Assert.Equal(typeof(string), priority!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.Equal(typeof(string), status!.GetTypeMapping().Converter?.ProviderClrType);
+        Assert.True(sourceActionIndex.IsUnique);
+        Assert.Equal(
+            [nameof(BacklogItem.WorkspaceId), nameof(BacklogItem.SourcePendingActionId)],
+            sourceActionIndex.Properties.Select(property => property.Name));
+        Assert.True(activeClusterIndex.IsUnique);
+        Assert.Equal(
+            [nameof(BacklogItem.WorkspaceId), nameof(BacklogItem.SourceClusterId)],
+            activeClusterIndex.Properties.Select(property => property.Name));
+        Assert.Equal("status IN ('Open', 'InProgress')", activeClusterIndex.GetFilter());
+        Assert.All(
+            backlogEntity.GetForeignKeys(),
             foreignKey => Assert.Equal(DeleteBehavior.Restrict, foreignKey.DeleteBehavior));
     }
 

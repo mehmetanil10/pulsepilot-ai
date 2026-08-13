@@ -198,6 +198,8 @@ public static class DependencyInjection
         services.AddScoped<IFeedbackEmbeddingRepository, FeedbackEmbeddingRepository>();
         services.AddScoped<IFeedbackClusterRepository, FeedbackClusterRepository>();
         services.AddScoped<IPendingActionRepository, PendingActionRepository>();
+        services.AddScoped<IBacklogItemRepository, BacklogItemRepository>();
+        services.AddScoped<IPendingActionExecutionLock, PostgreSqlPendingActionExecutionLock>();
         services.AddScoped<IFeedbackClusterAssignmentLock, PostgreSqlFeedbackClusterAssignmentLock>();
         services.AddScoped<IFeedbackProcessingQueue, FeedbackProcessingQueue>();
         services.AddScoped<IDemoDataSeeder, DemoDataSeeder>();

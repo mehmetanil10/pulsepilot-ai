@@ -1,6 +1,7 @@
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Common.Exceptions;
+using PulsePilot.Application.Tools;
 using PulsePilot.Domain.Actions;
 using PulsePilot.Domain.Workspaces;
 
@@ -8,6 +9,8 @@ namespace PulsePilot.Application.Actions;
 
 internal sealed class PendingActionService(
     IPendingActionRepository pendingActionRepository,
+    IPendingActionExecutionLock pendingActionExecutionLock,
+    ICreateBacklogItemTool createBacklogItemTool,
     IUnitOfWork unitOfWork,
     ICurrentUserContext currentUser,
     TimeProvider timeProvider) : IPendingActionService
@@ -77,13 +80,24 @@ internal sealed class PendingActionService(
     {
         EnsureAdminReviewer();
 
+        return await pendingActionExecutionLock.ExecuteAsync(
+            pendingActionId,
+            token => ReviewUnderLockAsync(pendingActionId, decision, token),
+            cancellationToken);
+    }
+
+    private async Task<PendingActionResponse> ReviewUnderLockAsync(
+        Guid pendingActionId,
+        PendingActionStatus decision,
+        CancellationToken cancellationToken)
+    {
         var pendingAction = await pendingActionRepository.GetForUpdateAsync(
             currentUser.WorkspaceId,
             pendingActionId,
             cancellationToken)
             ?? throw new NotFoundException("PendingAction", pendingActionId);
 
-        if (pendingAction.Status == decision)
+        if (IsDecisionSatisfied(pendingAction, decision))
         {
             return PendingActionResponse.FromEntity(pendingAction);
         }
@@ -98,6 +112,15 @@ internal sealed class PendingActionService(
         if (decision == PendingActionStatus.Approved)
         {
             pendingAction.Approve(reviewedAt);
+
+            if (pendingAction.ActionType == PendingActionType.CreateEngineeringIssue)
+            {
+                await createBacklogItemTool.ExecuteAsync(
+                    pendingAction,
+                    currentUser.UserId,
+                    reviewedAt,
+                    cancellationToken);
+            }
         }
         else
         {
@@ -115,7 +138,8 @@ internal sealed class PendingActionService(
                 pendingActionId,
                 cancellationToken);
 
-            if (currentAction?.Status == decision)
+            if (currentAction is not null
+                && IsDecisionSatisfied(currentAction, decision))
             {
                 return PendingActionResponse.FromEntity(currentAction);
             }
@@ -130,6 +154,16 @@ internal sealed class PendingActionService(
             ?? throw new NotFoundException("PendingAction", pendingActionId);
 
         return PendingActionResponse.FromEntity(persistedAction);
+    }
+
+    private static bool IsDecisionSatisfied(
+        PendingAction pendingAction,
+        PendingActionStatus decision)
+    {
+        return pendingAction.Status == decision
+            || (decision == PendingActionStatus.Approved
+                && pendingAction.ActionType == PendingActionType.CreateEngineeringIssue
+                && pendingAction.Status == PendingActionStatus.Executed);
     }
 
     private void EnsureAdminReviewer()

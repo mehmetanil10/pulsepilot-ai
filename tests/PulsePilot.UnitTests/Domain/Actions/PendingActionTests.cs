@@ -130,6 +130,37 @@ public sealed class PendingActionTests
         Assert.Equal(approvedAt, pendingAction.UpdatedAt);
     }
 
+    [Fact]
+    public void MarkExecuted_WhenApproved_RecordsExecutionAndIsIdempotent()
+    {
+        var createdAt = DateTimeOffset.UtcNow;
+        var approvedAt = createdAt.AddMinutes(1);
+        var executedAt = approvedAt.AddMinutes(1);
+        var pendingAction = CreatePendingAction(createdAt);
+        pendingAction.Approve(approvedAt);
+
+        pendingAction.MarkExecuted(executedAt);
+        pendingAction.MarkExecuted(executedAt.AddMinutes(1));
+
+        Assert.Equal(PendingActionStatus.Executed, pendingAction.Status);
+        Assert.Equal(approvedAt, pendingAction.ApprovedAt);
+        Assert.Equal(executedAt, pendingAction.ExecutedAt);
+        Assert.Equal(executedAt, pendingAction.UpdatedAt);
+    }
+
+    [Fact]
+    public void MarkExecuted_WhenNotApproved_IsRejectedWithoutMutation()
+    {
+        var createdAt = DateTimeOffset.UtcNow;
+        var pendingAction = CreatePendingAction(createdAt);
+
+        Assert.Throws<DomainException>(() =>
+            pendingAction.MarkExecuted(createdAt.AddMinutes(1)));
+        Assert.Equal(PendingActionStatus.Pending, pendingAction.Status);
+        Assert.Null(pendingAction.ExecutedAt);
+        Assert.Equal(createdAt, pendingAction.UpdatedAt);
+    }
+
     private static PendingAction CreatePendingAction(DateTimeOffset createdAt)
     {
         return PendingAction.Create(

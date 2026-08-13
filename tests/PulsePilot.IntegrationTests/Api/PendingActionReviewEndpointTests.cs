@@ -8,8 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Actions;
+using PulsePilot.Application.AI;
 using PulsePilot.Application.Authentication;
 using PulsePilot.Domain.Actions;
+using PulsePilot.Domain.Backlog;
 using PulsePilot.Domain.Feedback;
 using PulsePilot.Domain.Users;
 using PulsePilot.Domain.Workspaces;
@@ -36,6 +38,11 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
         using var memberClient = await CreateMemberClientAsync(factory, owner.Authentication);
         using var anonymousClient = factory.CreateClient();
         var actions = await SeedPendingActionsAsync(factory, owner.Authentication, count: 3);
+        var customerResponseAction = Assert.Single(await SeedPendingActionsAsync(
+            factory,
+            owner.Authentication,
+            count: 1,
+            actionType: PendingActionType.DraftCustomerResponse));
 
         using var approveResponse = await ownerClient.PostAsync(
             $"/api/actions/{actions[0].Id}/approve",
@@ -50,6 +57,11 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
         using var conflictingRejectResponse = await ownerClient.PostAsync(
             $"/api/actions/{actions[0].Id}/reject",
             content: null);
+        using var customerResponseApproveResponse = await ownerClient.PostAsync(
+            $"/api/actions/{customerResponseAction.Id}/approve",
+            content: null);
+        var approvedCustomerResponse = await customerResponseApproveResponse.Content
+            .ReadFromJsonAsync<PendingActionResponse>(SerializerOptions);
 
         using var rejectResponse = await ownerClient.PostAsync(
             $"/api/actions/{actions[1].Id}/reject",
@@ -74,12 +86,17 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
 
         Assert.Equal(HttpStatusCode.OK, approveResponse.StatusCode);
         Assert.NotNull(approved);
-        Assert.Equal(PendingActionStatus.Approved, approved.Status);
+        Assert.Equal(PendingActionStatus.Executed, approved.Status);
         Assert.NotNull(approved.ApprovedAt);
+        Assert.NotNull(approved.ExecutedAt);
         Assert.Null(approved.RejectedAt);
         Assert.Equal(HttpStatusCode.OK, repeatedApproveResponse.StatusCode);
         Assert.Equal(approved.ApprovedAt, repeatedApproval?.ApprovedAt);
+        Assert.Equal(approved.ExecutedAt, repeatedApproval?.ExecutedAt);
         Assert.Equal(HttpStatusCode.Conflict, conflictingRejectResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, customerResponseApproveResponse.StatusCode);
+        Assert.Equal(PendingActionStatus.Approved, approvedCustomerResponse?.Status);
+        Assert.Null(approvedCustomerResponse?.ExecutedAt);
 
         Assert.Equal(HttpStatusCode.OK, rejectResponse.StatusCode);
         Assert.NotNull(rejected);
@@ -100,6 +117,43 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
             .AsNoTracking()
             .SingleAsync(action => action.Id == actions[2].Id);
         Assert.Equal(PendingActionStatus.Pending, pendingAction.Status);
+        var backlogItem = await verificationScope.ServiceProvider
+            .GetRequiredService<AppDbContext>()
+            .BacklogItems
+            .AsNoTracking()
+            .SingleAsync(item => item.SourcePendingActionId == actions[0].Id);
+        Assert.Equal(BacklogItemPriority.P1, backlogItem.Priority);
+        Assert.Equal(BacklogItemStatus.Open, backlogItem.Status);
+        Assert.Equal(owner.Authentication.UserId, backlogItem.CreatedByUserId);
+        Assert.False(await verificationScope.ServiceProvider
+            .GetRequiredService<AppDbContext>()
+            .BacklogItems
+            .AnyAsync(item =>
+                item.SourcePendingActionId == customerResponseAction.Id));
+        var sourceFeedback = await verificationScope.ServiceProvider
+            .GetRequiredService<AppDbContext>()
+            .Feedback
+            .SingleAsync(feedback => feedback.Id == actions[0].FeedbackId);
+        var sourceCluster = await verificationScope.ServiceProvider
+            .GetRequiredService<AppDbContext>()
+            .FeedbackClusters
+            .SingleAsync(cluster => cluster.Id == actions[0].FeedbackClusterId);
+        var duplicateRecommendation = await verificationScope.ServiceProvider
+            .GetRequiredService<IPendingActionRecommender>()
+            .RecommendAsync(new ActionRecommendationContext(
+                sourceFeedback,
+                sourceCluster,
+                new FeedbackAnalysisResult(
+                    FeedbackCategory.Bug,
+                    FeedbackComponent.Payments,
+                    5,
+                    FeedbackSentiment.Negative,
+                    "Payment failures remain critical.",
+                    "Create another engineering issue.",
+                    0.98m),
+                FeedbackCount: 10,
+                RecommendedAt: DateTimeOffset.UtcNow));
+        Assert.Null(duplicateRecommendation);
     }
 
     [Fact]
@@ -128,11 +182,52 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
                 .SingleAsync(candidate => candidate.Id == action.Id);
 
             Assert.True(
-                persistedAction.Status is PendingActionStatus.Approved
+                persistedAction.Status is PendingActionStatus.Executed
                     or PendingActionStatus.Rejected);
             Assert.NotEqual(
                 persistedAction.ApprovedAt.HasValue,
                 persistedAction.RejectedAt.HasValue);
+        }
+        finally
+        {
+            foreach (var response in responses)
+            {
+                response.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConcurrentIdenticalApprovals_CreateExactlyOneBacklogItem()
+    {
+        await using var factory = new PulsePilotApiFactory(database.ConnectionString);
+        var owner = await CreateAuthenticatedClientAsync(factory, "review-idempotency");
+        using var ownerClient = owner.Client;
+        var action = Assert.Single(
+            await SeedPendingActionsAsync(factory, owner.Authentication, count: 1));
+
+        var responses = await Task.WhenAll(
+            ownerClient.PostAsync($"/api/actions/{action.Id}/approve", content: null),
+            ownerClient.PostAsync($"/api/actions/{action.Id}/approve", content: null));
+
+        try
+        {
+            Assert.All(
+                responses,
+                response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+
+            await using var scope = factory.Services.CreateAsyncScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var persistedAction = await dbContext.PendingActions
+                .AsNoTracking()
+                .SingleAsync(candidate => candidate.Id == action.Id);
+            var backlogItems = await dbContext.BacklogItems
+                .AsNoTracking()
+                .Where(item => item.SourcePendingActionId == action.Id)
+                .ToListAsync();
+
+            Assert.Equal(PendingActionStatus.Executed, persistedAction.Status);
+            Assert.Single(backlogItems);
         }
         finally
         {
@@ -204,7 +299,8 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
     private static async Task<IReadOnlyList<PendingAction>> SeedPendingActionsAsync(
         PulsePilotApiFactory factory,
         AuthenticationResponse owner,
-        int count)
+        int count,
+        PendingActionType actionType = PendingActionType.CreateEngineeringIssue)
     {
         var now = DateTimeOffset.UtcNow.AddMinutes(-1);
         var actions = new List<PendingAction>(count);
@@ -224,6 +320,10 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
                 FeedbackCategory.Bug,
                 FeedbackComponent.Payments,
                 now.AddMilliseconds(index));
+            cluster.UpdatePriority(
+                85m,
+                FeedbackPriority.P1,
+                now.AddSeconds(1));
             var feedback = FeedbackEntity.Create(
                 owner.WorkspaceId,
                 owner.UserId,
@@ -238,7 +338,7 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
                 owner.WorkspaceId,
                 feedback.Id,
                 cluster.Id,
-                PendingActionType.CreateEngineeringIssue,
+                actionType,
                 $"[P1] Payment failures {index}",
                 "Create an engineering issue for this cluster.",
                 "{\"priority\":\"p1\"}",
