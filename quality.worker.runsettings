@@ -5,10 +5,9 @@
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
           <Format>cobertura</Format>
-          <Include>[PulsePilot.Api]*,[PulsePilot.Application]*,[PulsePilot.Domain]*,[PulsePilot.Infrastructure]*</Include>
+          <Include>[PulsePilot.Worker]*</Include>
           <Exclude>[PulsePilot.*Tests]*</Exclude>
           <ExcludeByAttribute>CompilerGeneratedAttribute,GeneratedCodeAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
-          <ExcludeByFile>**/Migrations/*.cs</ExcludeByFile>
           <SkipAutoProps>true</SkipAutoProps>
           <DeterministicReport>true</DeterministicReport>
         </Configuration>

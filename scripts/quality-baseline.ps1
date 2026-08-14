@@ -13,7 +13,9 @@ $ErrorActionPreference = "Stop"
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $solutionPath = Join-Path $repositoryRoot "PulsePilot.sln"
-$runSettingsPath = Join-Path $repositoryRoot "quality.runsettings"
+$unitRunSettingsPath = Join-Path $repositoryRoot "quality.unit.runsettings"
+$workerRunSettingsPath = Join-Path $repositoryRoot "quality.worker.runsettings"
+$integrationRunSettingsPath = Join-Path $repositoryRoot "quality.runsettings"
 $qualityGatesPath = Join-Path $repositoryRoot "quality-gates.json"
 $artifactRoot = Join-Path $repositoryRoot "artifacts/quality"
 $dotnetArtifactRoot = Join-Path $artifactRoot "dotnet"
@@ -99,7 +101,8 @@ function Get-CoberturaMetrics {
 function Get-DotnetSuiteMetrics {
     param(
         [Parameter(Mandatory = $true)][string]$ProjectPath,
-        [Parameter(Mandatory = $true)][string]$SuiteName
+        [Parameter(Mandatory = $true)][string]$SuiteName,
+        [Parameter(Mandatory = $true)][string]$RunSettingsPath
     )
 
     $resultsDirectory = Join-Path $dotnetArtifactRoot $SuiteName
@@ -111,7 +114,7 @@ function Get-DotnetSuiteMetrics {
         "--configuration", $Configuration,
         "--no-build",
         "--no-restore",
-        "--settings", $runSettingsPath,
+        "--settings", $RunSettingsPath,
         "--collect", "XPlat Code Coverage",
         "--logger", "trx;LogFileName=$SuiteName.trx",
         "--results-directory", $resultsDirectory
@@ -188,13 +191,20 @@ if (-not $SkipBuild) {
 
 $unitMetrics = Get-DotnetSuiteMetrics `
     (Join-Path $repositoryRoot "tests/PulsePilot.UnitTests/PulsePilot.UnitTests.csproj") `
-    "unit"
+    "unit" `
+    $unitRunSettingsPath
+
+$workerMetrics = Get-DotnetSuiteMetrics `
+    (Join-Path $repositoryRoot "tests/PulsePilot.Worker.UnitTests/PulsePilot.Worker.UnitTests.csproj") `
+    "worker" `
+    $workerRunSettingsPath
 
 $integrationMetrics = $null
 if (-not $SkipIntegrationTests) {
     $integrationMetrics = Get-DotnetSuiteMetrics `
         (Join-Path $repositoryRoot "tests/PulsePilot.IntegrationTests/PulsePilot.IntegrationTests.csproj") `
-        "integration"
+        "integration" `
+        $integrationRunSettingsPath
 }
 
 Invoke-CheckedCommand "npm" @("--prefix", $webRoot, "run", "test:coverage")
@@ -208,6 +218,10 @@ if (-not $SkipQualityGate) {
     Add-MinimumFailure $gateFailures "Unit test count" $unitMetrics.tests.total $gates.dotnetUnit.minimumTests
     Add-MinimumFailure $gateFailures "Unit line coverage" $unitMetrics.coverage.lineCoverage $gates.dotnetUnit.minimumLineCoverage
     Add-MinimumFailure $gateFailures "Unit branch coverage" $unitMetrics.coverage.branchCoverage $gates.dotnetUnit.minimumBranchCoverage
+
+    Add-MinimumFailure $gateFailures "Worker test count" $workerMetrics.tests.total $gates.dotnetWorker.minimumTests
+    Add-MinimumFailure $gateFailures "Worker line coverage" $workerMetrics.coverage.lineCoverage $gates.dotnetWorker.minimumLineCoverage
+    Add-MinimumFailure $gateFailures "Worker branch coverage" $workerMetrics.coverage.branchCoverage $gates.dotnetWorker.minimumBranchCoverage
 
     if ($null -ne $integrationMetrics) {
         Add-MinimumFailure $gateFailures "Integration test count" $integrationMetrics.tests.total $gates.dotnetIntegration.minimumTests
@@ -240,6 +254,7 @@ $report = [ordered]@{
     configuration = $Configuration
     integrationTestsIncluded = -not $SkipIntegrationTests
     dotnetUnit = $unitMetrics
+    dotnetWorker = $workerMetrics
     dotnetIntegration = $integrationMetrics
     web = $webMetrics
     qualityGate = [ordered]@{
@@ -253,6 +268,7 @@ $report | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $baselineReportPath
 Write-Host ""
 Write-Host "PulsePilot quality baseline" -ForegroundColor Cyan
 Write-Host "  .NET unit:        $($unitMetrics.tests.total) tests, $($unitMetrics.coverage.lineCoverage)% lines, $($unitMetrics.coverage.branchCoverage)% branches"
+Write-Host "  .NET worker:      $($workerMetrics.tests.total) tests, $($workerMetrics.coverage.lineCoverage)% lines, $($workerMetrics.coverage.branchCoverage)% branches"
 if ($null -ne $integrationMetrics) {
     Write-Host "  .NET integration: $($integrationMetrics.tests.total) tests, $($integrationMetrics.coverage.lineCoverage)% lines, $($integrationMetrics.coverage.branchCoverage)% branches"
 }

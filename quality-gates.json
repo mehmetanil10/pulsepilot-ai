@@ -4,16 +4,21 @@
     "minimumLineCoverage": 69,
     "minimumBranchCoverage": 75
   },
+  "dotnetWorker": {
+    "minimumTests": 2,
+    "minimumLineCoverage": 100,
+    "minimumBranchCoverage": 100
+  },
   "dotnetIntegration": {
-    "minimumTests": 80,
+    "minimumTests": 81,
     "minimumLineCoverage": 92,
     "minimumBranchCoverage": 57
   },
   "web": {
-    "minimumTests": 34,
-    "minimumLineCoverage": 21,
-    "minimumBranchCoverage": 74,
-    "minimumFunctionCoverage": 60,
-    "minimumStatementCoverage": 21
+    "minimumTests": 51,
+    "minimumLineCoverage": 38,
+    "minimumBranchCoverage": 80,
+    "minimumFunctionCoverage": 68,
+    "minimumStatementCoverage": 38
   }
 }

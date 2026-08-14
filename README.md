@@ -68,8 +68,8 @@ PostgreSQL containers automatically.
 
 ## Quality baseline
 
-The repository has one repeatable Release-mode quality command for the .NET unit
-suite, Docker-backed integration suite, and Next.js/Vitest suite:
+The repository has one repeatable Release-mode quality command for the core and
+Worker unit suites, Docker-backed integration suite, and Next.js/Vitest suite:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
@@ -78,8 +78,19 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 It restores and builds both stacks, collects Cobertura and V8 coverage, checks
 the committed regression floors in `quality-gates.json`, and writes ignored
-reports below `artifacts/quality`. The measured Sprint 4 starting point, coverage
-scope, and known gaps are documented in `docs/quality-baseline.md`.
+reports below `artifacts/quality`. The measured Sprint 4 baseline, coverage
+scope, and remaining gaps are documented in `docs/quality-baseline.md`.
+
+The browser acceptance journey runs against an isolated Docker Compose project
+with disposable ports, credentials, and PostgreSQL data:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\e2e-acceptance.ps1
+```
+
+Use `-SkipImageBuild` for a faster rerun when the application images are already
+current. The script always removes its temporary containers, network, and volume.
 
 ## Docker setup
 
