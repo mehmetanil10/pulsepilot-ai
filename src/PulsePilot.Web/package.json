@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings=0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage --reporter=default --reporter=json --outputFile=../../artifacts/quality/web-tests.json"
   },
   "dependencies": {
     "next": "16.3.0",
@@ -23,6 +24,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "3.2.6",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",

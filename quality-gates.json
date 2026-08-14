@@ -1,0 +1,19 @@
+{
+  "dotnetUnit": {
+    "minimumTests": 122,
+    "minimumLineCoverage": 69,
+    "minimumBranchCoverage": 75
+  },
+  "dotnetIntegration": {
+    "minimumTests": 80,
+    "minimumLineCoverage": 92,
+    "minimumBranchCoverage": 57
+  },
+  "web": {
+    "minimumTests": 34,
+    "minimumLineCoverage": 21,
+    "minimumBranchCoverage": 74,
+    "minimumFunctionCoverage": 60,
+    "minimumStatementCoverage": 21
+  }
+}

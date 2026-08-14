@@ -21,6 +21,7 @@ secrets.json
 
 # Test output
 TestResults/
+artifacts/
 coverage/
 *.coverage
 *.coveragexml

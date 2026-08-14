@@ -6,7 +6,8 @@ issues, and keep critical actions behind human approval.
 
 ## Current status
 
-Sprint 1 and Sprint 2 are complete, and Sprint 3 is in progress. The .NET 10
+Sprint 1, Sprint 2, and Sprint 3 are complete, and Sprint 4 production hardening
+is in progress. The .NET 10
 Clean Architecture foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, idempotent demo seed, and a Next.js 16 App Router frontend foundation are
@@ -64,6 +65,21 @@ dotnet test PulsePilot.sln --configuration Release --no-build
 
 The integration tests require a running Docker engine and create disposable
 PostgreSQL containers automatically.
+
+## Quality baseline
+
+The repository has one repeatable Release-mode quality command for the .NET unit
+suite, Docker-backed integration suite, and Next.js/Vitest suite:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\quality-baseline.ps1
+```
+
+It restores and builds both stacks, collects Cobertura and V8 coverage, checks
+the committed regression floors in `quality-gates.json`, and writes ignored
+reports below `artifacts/quality`. The measured Sprint 4 starting point, coverage
+scope, and known gaps are documented in `docs/quality-baseline.md`.
 
 ## Docker setup
 
