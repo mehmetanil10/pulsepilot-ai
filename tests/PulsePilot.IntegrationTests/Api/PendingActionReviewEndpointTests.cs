@@ -267,6 +267,84 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
     }
 
     [Fact]
+    public async Task CustomerResponseApproval_RetriesTransientFailureAndExecutesOnce()
+    {
+        var llmClient = new CustomerResponseLlmClient(transientFailuresBeforeSuccess: 1);
+        await using var factory = new PulsePilotApiFactory(
+            database.ConnectionString,
+            services =>
+            {
+                services.RemoveAll<ILLMClient>();
+                services.AddSingleton<ILLMClient>(llmClient);
+            });
+        var owner = await CreateAuthenticatedClientAsync(factory, "draft-retry-success");
+        using var ownerClient = owner.Client;
+        var action = Assert.Single(await SeedPendingActionsAsync(
+            factory,
+            owner.Authentication,
+            count: 1,
+            actionType: PendingActionType.DraftCustomerResponse));
+
+        using var response = await ownerClient.PostAsync(
+            $"/api/actions/{action.Id}/approve",
+            content: null);
+        var approved = await response.Content.ReadFromJsonAsync<PendingActionResponse>(
+            SerializerOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(PendingActionStatus.Executed, approved?.Status);
+        Assert.Equal(2, llmClient.DraftCallCount);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var drafts = await scope.ServiceProvider
+            .GetRequiredService<AppDbContext>()
+            .CustomerResponseDrafts
+            .AsNoTracking()
+            .Where(draft => draft.SourcePendingActionId == action.Id)
+            .ToListAsync();
+
+        Assert.Single(drafts);
+    }
+
+    [Fact]
+    public async Task CustomerResponseApproval_DoesNotRetryPermanentFailure()
+    {
+        var llmClient = new FailingCustomerResponseLlmClient(isTransient: false);
+        await using var factory = new PulsePilotApiFactory(
+            database.ConnectionString,
+            services =>
+            {
+                services.RemoveAll<ILLMClient>();
+                services.AddSingleton<ILLMClient>(llmClient);
+            });
+        var owner = await CreateAuthenticatedClientAsync(factory, "draft-permanent-failure");
+        using var ownerClient = owner.Client;
+        var action = Assert.Single(await SeedPendingActionsAsync(
+            factory,
+            owner.Authentication,
+            count: 1,
+            actionType: PendingActionType.DraftCustomerResponse));
+
+        using var response = await ownerClient.PostAsync(
+            $"/api/actions/{action.Id}/approve",
+            content: null);
+
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        Assert.Equal(1, llmClient.DraftCallCount);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedAction = await dbContext.PendingActions
+            .AsNoTracking()
+            .SingleAsync(candidate => candidate.Id == action.Id);
+
+        Assert.Equal(PendingActionStatus.Pending, persistedAction.Status);
+        Assert.False(await dbContext.CustomerResponseDrafts
+            .AsNoTracking()
+            .AnyAsync(draft => draft.SourcePendingActionId == action.Id));
+    }
+
+    [Fact]
     public async Task ConcurrentIdenticalApprovals_CreateExactlyOneBacklogItem()
     {
         await using var factory = new PulsePilotApiFactory(database.ConnectionString);
@@ -457,7 +535,8 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
         HttpClient Client,
         AuthenticationResponse Authentication);
 
-    private sealed class CustomerResponseLlmClient : ILLMClient
+    private sealed class CustomerResponseLlmClient(
+        int transientFailuresBeforeSuccess = 0) : ILLMClient
     {
         public const string DraftContent =
             "We're sorry you're experiencing this payment issue. Our team is reviewing the report, and we appreciate you bringing it to our attention.";
@@ -485,7 +564,15 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Interlocked.Increment(ref _draftCallCount);
+            var callCount = Interlocked.Increment(ref _draftCallCount);
+
+            if (callCount <= transientFailuresBeforeSuccess)
+            {
+                throw new LlmProviderException(
+                    LlmProviderFailureKind.ProviderUnavailable,
+                    "The AI provider is temporarily unavailable.",
+                    isTransient: true);
+            }
 
             return Task.FromResult(new CustomerResponseDraftResult(DraftContent));
         }
@@ -498,7 +585,8 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
         }
     }
 
-    private sealed class FailingCustomerResponseLlmClient : ILLMClient
+    private sealed class FailingCustomerResponseLlmClient(
+        bool isTransient = true) : ILLMClient
     {
         private int _draftCallCount;
 
@@ -527,7 +615,7 @@ public sealed class PendingActionReviewEndpointTests(PostgreSqlFixture database)
             throw new LlmProviderException(
                 LlmProviderFailureKind.ProviderUnavailable,
                 "The AI provider is temporarily unavailable.",
-                isTransient: true);
+                isTransient);
         }
 
         public Task<ProductReportResult> GenerateReportAsync(

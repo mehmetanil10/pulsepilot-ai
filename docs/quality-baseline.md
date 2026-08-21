@@ -1,7 +1,7 @@
 # Quality baseline
 
 This document records the Sprint 4 quality baseline established in Task 34 and
-ratcheted through Task 39. It is a regression floor, not the final coverage
+ratcheted through Task 40. It is a regression floor, not the final coverage
 target.
 
 ## Reproduce the baseline
@@ -37,7 +37,7 @@ fails.
 
 ## Current measured baseline
 
-Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 273
+Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 280
 quality-baseline tests and both Playwright acceptance scenarios passed; none were
 skipped.
 
@@ -45,7 +45,7 @@ skipped.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | .NET unit | 134 | 69.34% | 75.63% | n/a | n/a |
 | .NET Worker unit | 2 | 100.00% | 100.00% | n/a | n/a |
-| .NET integration | 86 | 93.30% | 59.13% | n/a | n/a |
+| .NET integration | 93 | 93.33% | 59.90% | n/a | n/a |
 | Web unit/component | 51 | 38.90% | 80.10% | 68.45% | 38.90% |
 | Browser acceptance | 2 | n/a | n/a | n/a | n/a |
 
@@ -78,6 +78,14 @@ details, stable problem codes and types, trace correlation, safe malformed JSON,
 authenticated missing routes, no-store/nosniff headers, and the absence of
 exception messages or stack traces in unexpected `500` responses.
 
+Task 40 added seven logging and retry tests and ratcheted the suite from 273 to
+280 tests. The shared API/Worker redactor is exercised against sensitive property
+names, nested objects, email addresses, bearer/JWT values, provider keys, and
+credential-like query values while proving operational metadata remains useful.
+Retry coverage now explicitly protects transient recovery, permanent one-attempt
+failure, and configured attempt exhaustion for feedback processing, reports, and
+customer-response drafting.
+
 ## Regression floors
 
 `quality-gates.json` contains deliberately conservative, whole-percentage floors
@@ -88,7 +96,7 @@ filtering of test cases, while coverage floors prevent meaningful regressions.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | .NET unit | 134 | 69% | 75% | n/a | n/a |
 | .NET Worker unit | 2 | 100% | 100% | n/a | n/a |
-| .NET integration | 86 | 93% | 59% | n/a | n/a |
+| .NET integration | 93 | 93% | 59% | n/a | n/a |
 | Web unit/component | 51 | 38% | 80% | 68% | 38% |
 
 A failed command, failed test, missing report, lower test count, or coverage

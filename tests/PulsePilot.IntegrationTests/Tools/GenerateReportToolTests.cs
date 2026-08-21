@@ -106,6 +106,39 @@ public sealed class GenerateReportToolTests(PostgreSqlFixture database)
             null!));
     }
 
+    [Fact]
+    public async Task Tool_DoesNotRetryPermanentProviderFailure()
+    {
+        var llmClient = new ReportLlmClient(
+            terminalFailure: new LlmProviderException(
+                LlmProviderFailureKind.Refused,
+                "The provider permanently refused the report request."));
+        await using var serviceProvider = CreateServiceProvider(llmClient);
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var tool = scope.ServiceProvider.GetRequiredService<IGenerateReportTool>();
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            tool.ExecuteAsync(Guid.CreateVersion7(), new GenerateReportToolInput()));
+
+        Assert.Equal(LlmProviderFailureKind.Refused, exception.FailureKind);
+        Assert.Equal(1, llmClient.CallCount);
+    }
+
+    [Fact]
+    public async Task Tool_StopsAfterConfiguredTransientAttemptLimit()
+    {
+        var llmClient = new ReportLlmClient(transientFailuresBeforeSuccess: int.MaxValue);
+        await using var serviceProvider = CreateServiceProvider(llmClient);
+        await using var scope = serviceProvider.CreateAsyncScope();
+        var tool = scope.ServiceProvider.GetRequiredService<IGenerateReportTool>();
+
+        var exception = await Assert.ThrowsAsync<LlmProviderException>(() =>
+            tool.ExecuteAsync(Guid.CreateVersion7(), new GenerateReportToolInput()));
+
+        Assert.True(exception.IsTransient);
+        Assert.Equal(2, llmClient.CallCount);
+    }
+
     private ServiceProvider CreateServiceProvider(ReportLlmClient llmClient)
     {
         return database.CreateServiceProvider(
@@ -119,7 +152,9 @@ public sealed class GenerateReportToolTests(PostgreSqlFixture database)
             });
     }
 
-    private sealed class ReportLlmClient(int transientFailuresBeforeSuccess = 0) : ILLMClient
+    private sealed class ReportLlmClient(
+        int transientFailuresBeforeSuccess = 0,
+        LlmProviderException? terminalFailure = null) : ILLMClient
     {
         private int _callCount;
 
@@ -162,6 +197,11 @@ public sealed class GenerateReportToolTests(PostgreSqlFixture database)
                     LlmProviderFailureKind.ProviderUnavailable,
                     "Temporary report provider failure.",
                     isTransient: true);
+            }
+
+            if (terminalFailure is not null)
+            {
+                throw terminalFailure;
             }
 
             return Task.FromResult(new ProductReportResult(

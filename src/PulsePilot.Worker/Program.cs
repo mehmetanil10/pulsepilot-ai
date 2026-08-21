@@ -1,6 +1,7 @@
 using PulsePilot.Application;
 using PulsePilot.Application.FeedbackProcessing;
 using PulsePilot.Infrastructure;
+using PulsePilot.Infrastructure.Observability;
 using PulsePilot.Worker;
 using Serilog;
 
@@ -9,6 +10,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfiguration
     .ReadFrom.Configuration(builder.Configuration)
     .ReadFrom.Services(services)
+    .Enrich.With<PiiRedactionEnricher>()
     .Enrich.FromLogContext());
 
 builder.Services.AddApplication();

@@ -12,6 +12,7 @@ using PulsePilot.Api.HealthChecks;
 using PulsePilot.Api.Validation;
 using PulsePilot.Application;
 using PulsePilot.Infrastructure;
+using PulsePilot.Infrastructure.Observability;
 using PulsePilot.Infrastructure.Persistence;
 using PulsePilot.Infrastructure.Persistence.Seeding;
 using Serilog;
@@ -21,6 +22,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfiguration
     .ReadFrom.Configuration(builder.Configuration)
     .ReadFrom.Services(services)
+    .Enrich.With<PiiRedactionEnricher>()
     .Enrich.FromLogContext());
 
 builder.Services.AddApplication();

@@ -23,10 +23,11 @@ public sealed class GlobalExceptionHandler(
         if (problemDetails.Status >= StatusCodes.Status500InternalServerError)
         {
             logger.LogError(
-                exception,
-                "An unhandled exception occurred while processing {RequestMethod} {RequestPath}",
+                "An unhandled {ErrorType} occurred while processing {RequestMethod} {RequestPath}; trace {TraceId}",
+                exception.GetType().Name,
                 httpContext.Request.Method,
-                httpContext.Request.Path);
+                httpContext.Request.Path,
+                httpContext.TraceIdentifier);
         }
         else
         {

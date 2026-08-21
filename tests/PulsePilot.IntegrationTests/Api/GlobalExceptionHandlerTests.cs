@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PulsePilot.Api.ErrorHandling;
 using PulsePilot.Application.Authentication;
@@ -79,6 +80,38 @@ public sealed class GlobalExceptionHandlerTests(PostgreSqlFixture database)
         Assert.Equal(StatusCodes.Status500InternalServerError, httpContext.Response.StatusCode);
         Assert.DoesNotContain("sensitive", problemDetails.Detail, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("internal_error", problemDetails.Extensions["code"]);
+    }
+
+    [Fact]
+    public async Task TryHandleAsync_UnexpectedException_LogsOnlySafeMetadata()
+    {
+        var logger = new CapturingLogger<GlobalExceptionHandler>();
+        var handler = new GlobalExceptionHandler(
+            new CapturingProblemDetailsService(),
+            logger);
+        var httpContext = new DefaultHttpContext
+        {
+            TraceIdentifier = "safe-trace-id",
+        };
+        httpContext.Request.Method = "POST";
+        httpContext.Request.Path = "/api/feedback";
+        const string sensitiveMessage =
+            "customer.private@example.com used Bearer secret-provider-token";
+
+        await handler.TryHandleAsync(
+            httpContext,
+            new InvalidOperationException(sensitiveMessage),
+            CancellationToken.None);
+
+        Assert.Null(logger.Exception);
+        Assert.NotNull(logger.Message);
+        Assert.Contains("InvalidOperationException", logger.Message, StringComparison.Ordinal);
+        Assert.Contains("safe-trace-id", logger.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(sensitiveMessage, logger.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "customer.private@example.com",
+            logger.Message,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -279,6 +312,35 @@ public sealed class GlobalExceptionHandlerTests(PostgreSqlFixture database)
         {
             Written = context;
             return ValueTask.FromResult(true);
+        }
+    }
+
+    private sealed class CapturingLogger<T> : ILogger<T>
+    {
+        public Exception? Exception { get; private set; }
+
+        public string? Message { get; private set; }
+
+        public IDisposable? BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Exception = exception;
+            Message = formatter(state, exception);
         }
     }
 

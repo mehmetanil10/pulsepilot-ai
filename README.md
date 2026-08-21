@@ -243,7 +243,11 @@ after the first sign-in while preserving approval as the execution boundary.
   request, and domain failures use allow-listed public messages. Exception
   messages and stack traces remain server-side; validation failures retain only
   intentional field-level guidance.
-- Serilog emits structured request and application logs to the console.
+- API and Worker use the same Serilog PII-redaction enricher before writing
+  structured console logs. Sensitive property names and inline email, bearer/JWT,
+  API-key, credential, and query-value patterns become `[REDACTED]`; operational
+  identifiers, attempt counts, durations, statuses, and failure kinds remain
+  available for diagnosis.
 - Swagger UI is available at `/swagger` in the Development environment.
 - `/health/live` checks process liveness; `/health/ready` also checks PostgreSQL.
 
@@ -508,7 +512,10 @@ result again before returning it to the application. Provider refusal,
 incomplete output, malformed JSON, contract violations, and transient HTTP
 failures are represented by provider-neutral application errors. SDK request and
 content logging is disabled so feedback text and API credentials are not written
-to application logs.
+to application logs. Console templates do not render exception payloads; global
+errors log only the exception type, method, path, and trace identifier. The
+shared redactor provides defense in depth for structured properties and nested
+objects added by future logging changes.
 
 OpenAI access is disabled by default. To enable it locally, set these values in
 `.env`; never commit a real key:
@@ -532,6 +539,16 @@ leases are recovered after the configured threshold, while late results from an
 expired lease are discarded. Analysis and embedding calls each use the same
 bounded retry and timeout policy. A feedback row is marked `Completed` only after
 both validated results are saved atomically.
+
+Application-level retries are intentionally bounded and the OpenAI SDK's own
+automatic retries are disabled to avoid multiplying attempts. Feedback analysis
+and embedding use exponential backoff with jitter; report generation and
+customer-response drafting use short bounded linear delays. Only transient
+provider failures and timeouts are retried. Permanent refusal/contract failures
+stop after one call, caller cancellation is propagated immediately, and an
+exhausted operation stops at its configured maximum without persisting a partial
+result. Deterministic tests cover recovery, permanent failures, timeouts, and
+attempt limits for all three workflows.
 
 Analysis state and the latest persisted result are available through:
 
