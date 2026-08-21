@@ -15,6 +15,18 @@ RUN npm run build
 FROM ${NODE_IMAGE} AS final
 WORKDIR /app
 
+# Refresh Alpine security packages and remove build-time package managers from
+# the production image. The standalone Next.js server only requires Node.js.
+RUN apk upgrade --no-cache \
+    && rm -rf /usr/local/lib/node_modules/npm \
+              /usr/local/lib/node_modules/corepack \
+              /opt/yarn-v* \
+    && rm -f /usr/local/bin/npm \
+             /usr/local/bin/npx \
+             /usr/local/bin/corepack \
+             /usr/local/bin/yarn \
+             /usr/local/bin/yarnpkg
+
 ARG BUILD_CREATED=unknown
 ARG BUILD_REVISION=unknown
 ARG BUILD_VERSION=dev

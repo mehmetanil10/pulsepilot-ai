@@ -30,7 +30,8 @@ The `Production containers` job starts only after the quality job passes. It:
 1. builds the digest-pinned API, migration, Worker, and Web images with commit,
    run, and creation metadata; builds are deliberately sequential to stay below
    GitHub-hosted runner memory limits, and Next.js page generation is capped at
-   two workers;
+   two workers; the Web runtime also refreshes Alpine security packages and
+   removes package managers that are unnecessary after the standalone build;
 2. executes the Compose/image hardening validator;
 3. starts the isolated production stack and completes the two-scenario Chromium
    acceptance journey;

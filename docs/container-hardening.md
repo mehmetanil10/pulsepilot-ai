@@ -18,6 +18,9 @@ boundary.
 - API, migration, Worker, and Web all declare non-root users. Runtime images do
   not contain build SDKs, source trees, package-manager caches, or application
   secrets.
+- The Web final stage refreshes Alpine security packages and removes npm, npx,
+  Corepack, and Yarn. Those tools remain available only in the dependency and
+  build stages; the standalone production server requires Node.js alone.
 - Health checks use Docker exec form, and final images carry OCI source,
   revision, version, creation-time, title, and description labels.
 - The one-shot migration has its own target and image. It does not inherit the
@@ -67,8 +70,9 @@ default port, writable application root, retained Linux capability, unbounded
 PID use, root image user, missing OCI metadata, shell-form health check, or
 secret-like image environment variable.
 
-For reproducible release metadata, CI should supply `BUILD_CREATED`,
-`BUILD_REVISION`, `BUILD_VERSION`, and an immutable `IMAGE_TAG`. Task 44 will
-automate those values and the build/test gates in GitHub Actions. A deployment
-platform may impose tighter CPU, memory, replica, ingress, TLS, and secret-store
-policies in Tasks 44-45.
+For reproducible release metadata, CI supplies `BUILD_CREATED`,
+`BUILD_REVISION`, `BUILD_VERSION`, and an immutable `IMAGE_TAG`. The Task 44
+GitHub Actions workflow automates these values, validates the runtime contract,
+and scans every final image for fixable critical/high vulnerabilities. A
+deployment platform may impose tighter CPU, memory, replica, ingress, TLS, and
+secret-store policies in Task 45.
