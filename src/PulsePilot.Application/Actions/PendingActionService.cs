@@ -1,6 +1,7 @@
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Common.Exceptions;
+using PulsePilot.Application.Observability;
 using PulsePilot.Application.Tools;
 using PulsePilot.Domain.Actions;
 using PulsePilot.Domain.Workspaces;
@@ -80,6 +81,7 @@ internal sealed class PendingActionService(
         CancellationToken cancellationToken)
     {
         EnsureAdminReviewer();
+        using var activity = PulsePilotTelemetry.StartPendingActionReview(decision);
 
         return await pendingActionExecutionLock.ExecuteAsync(
             pendingActionId,
@@ -100,6 +102,10 @@ internal sealed class PendingActionService(
 
         if (IsDecisionSatisfied(pendingAction, decision))
         {
+            PulsePilotTelemetry.RecordPendingActionReview(
+                decision,
+                pendingAction.ActionType,
+                "idempotent");
             return PendingActionResponse.FromEntity(pendingAction);
         }
 
@@ -150,6 +156,10 @@ internal sealed class PendingActionService(
             if (currentAction is not null
                 && IsDecisionSatisfied(currentAction, decision))
             {
+                PulsePilotTelemetry.RecordPendingActionReview(
+                    decision,
+                    currentAction.ActionType,
+                    "idempotent");
                 return PendingActionResponse.FromEntity(currentAction);
             }
 
@@ -161,6 +171,11 @@ internal sealed class PendingActionService(
             pendingActionId,
             cancellationToken)
             ?? throw new NotFoundException("PendingAction", pendingActionId);
+
+        PulsePilotTelemetry.RecordPendingActionReview(
+            decision,
+            persistedAction.ActionType,
+            decision == PendingActionStatus.Approved ? "executed" : "reviewed");
 
         return PendingActionResponse.FromEntity(persistedAction);
     }

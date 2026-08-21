@@ -1,7 +1,7 @@
 # Quality baseline
 
 This document records the Sprint 4 quality baseline established in Task 34 and
-ratcheted through Task 40. It is a regression floor, not the final coverage
+ratcheted through Task 41. It is a regression floor, not the final coverage
 target.
 
 ## Reproduce the baseline
@@ -37,15 +37,15 @@ fails.
 
 ## Current measured baseline
 
-Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 280
+Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 297
 quality-baseline tests and both Playwright acceptance scenarios passed; none were
 skipped.
 
 | Suite | Tests | Line coverage | Branch coverage | Function coverage | Statement coverage |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| .NET unit | 134 | 69.34% | 75.63% | n/a | n/a |
+| .NET unit | 149 | 70.98% | 78.34% | n/a | n/a |
 | .NET Worker unit | 2 | 100.00% | 100.00% | n/a | n/a |
-| .NET integration | 93 | 93.33% | 59.90% | n/a | n/a |
+| .NET integration | 95 | 93.38% | 60.33% | n/a | n/a |
 | Web unit/component | 51 | 38.90% | 80.10% | 68.45% | 38.90% |
 | Browser acceptance | 2 | n/a | n/a | n/a | n/a |
 
@@ -86,6 +86,13 @@ Retry coverage now explicitly protects transient recovery, permanent one-attempt
 failure, and configured attempt exhaustion for feedback processing, reports, and
 customer-response drafting.
 
+Task 41 added 17 deterministic telemetry tests and ratcheted the suite from 280
+to 297 tests. Activity and meter listeners now protect PII-safe bounded tags,
+all feedback-source mappings, success/failure/no-op spans, AI retry measurements,
+human review decisions, host provider registration, and invalid OTLP endpoint
+rejection. API and Worker share ASP.NET Core, HTTP, runtime, PostgreSQL, custom
+trace, and metric instrumentation while OTLP export remains explicit opt-in.
+
 ## Regression floors
 
 `quality-gates.json` contains deliberately conservative, whole-percentage floors
@@ -94,9 +101,9 @@ filtering of test cases, while coverage floors prevent meaningful regressions.
 
 | Suite | Minimum tests | Minimum lines | Minimum branches | Minimum functions | Minimum statements |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| .NET unit | 134 | 69% | 75% | n/a | n/a |
+| .NET unit | 149 | 70% | 78% | n/a | n/a |
 | .NET Worker unit | 2 | 100% | 100% | n/a | n/a |
-| .NET integration | 93 | 93% | 59% | n/a | n/a |
+| .NET integration | 95 | 93% | 60% | n/a | n/a |
 | Web unit/component | 51 | 38% | 80% | 68% | 38% |
 
 A failed command, failed test, missing report, lower test count, or coverage
@@ -119,7 +126,7 @@ only move upward as coverage improves.
 - Integration tests use disposable PostgreSQL Testcontainers and make no external
   AI provider calls.
 
-## Remaining priorities after Task 38
+## Remaining priorities after Task 41
 
 - Server-rendered page/data modules and the larger dashboard, feedback, backlog,
   and actions views still have limited direct unit coverage; the main workspace

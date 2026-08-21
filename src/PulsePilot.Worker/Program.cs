@@ -15,6 +15,9 @@ builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfigurati
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddPulsePilotOpenTelemetry(
+    builder.Configuration,
+    serviceName: "PulsePilot.Worker");
 builder.Services.AddOptions<FeedbackProcessingOptions>()
     .BindConfiguration(FeedbackProcessingOptions.SectionName)
     .Validate(

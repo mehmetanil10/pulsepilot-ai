@@ -1,8 +1,8 @@
 {
   "dotnetUnit": {
-    "minimumTests": 134,
-    "minimumLineCoverage": 69,
-    "minimumBranchCoverage": 75
+    "minimumTests": 149,
+    "minimumLineCoverage": 70,
+    "minimumBranchCoverage": 78
   },
   "dotnetWorker": {
     "minimumTests": 2,
@@ -10,9 +10,9 @@
     "minimumBranchCoverage": 100
   },
   "dotnetIntegration": {
-    "minimumTests": 93,
+    "minimumTests": 95,
     "minimumLineCoverage": 93,
-    "minimumBranchCoverage": 59
+    "minimumBranchCoverage": 60
   },
   "web": {
     "minimumTests": 51,

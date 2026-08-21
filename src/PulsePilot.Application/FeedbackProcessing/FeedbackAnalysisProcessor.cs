@@ -5,6 +5,7 @@ using PulsePilot.Application.Actions;
 using PulsePilot.Application.AI;
 using PulsePilot.Application.Common.Exceptions;
 using PulsePilot.Application.Feedback;
+using PulsePilot.Application.Observability;
 using PulsePilot.Application.Prioritization;
 using PulsePilot.Domain.Feedback;
 
@@ -41,6 +42,7 @@ internal sealed class FeedbackAnalysisProcessor(
         }
 
         var startedAt = timeProvider.GetTimestamp();
+        using var activity = PulsePilotTelemetry.StartFeedbackProcessing(item.Source);
 
         try
         {
@@ -63,7 +65,7 @@ internal sealed class FeedbackAnalysisProcessor(
                 sourceHash,
                 cancellationToken);
 
-            return new FeedbackAnalysisProcessResult(
+            var result = new FeedbackAnalysisProcessResult(
                 completed
                     ? FeedbackAnalysisProcessStatus.Succeeded
                     : FeedbackAnalysisProcessStatus.Abandoned,
@@ -72,12 +74,18 @@ internal sealed class FeedbackAnalysisProcessor(
                 attempts,
                 timeProvider.GetElapsedTime(startedAt),
                 null);
+            PulsePilotTelemetry.RecordFeedbackProcessing(
+                result.Status,
+                result.Duration,
+                result.Attempts);
+
+            return result;
         }
         catch (AnalysisFailedException exception)
         {
             var failed = await FailAsync(item, cancellationToken);
 
-            return new FeedbackAnalysisProcessResult(
+            var result = new FeedbackAnalysisProcessResult(
                 failed
                     ? FeedbackAnalysisProcessStatus.Failed
                     : FeedbackAnalysisProcessStatus.Abandoned,
@@ -86,6 +94,13 @@ internal sealed class FeedbackAnalysisProcessor(
                 exception.Attempts,
                 timeProvider.GetElapsedTime(startedAt),
                 exception.FailureKind);
+            PulsePilotTelemetry.RecordFeedbackProcessing(
+                result.Status,
+                result.Duration,
+                result.Attempts,
+                result.FailureKind);
+
+            return result;
         }
     }
 
@@ -99,7 +114,8 @@ internal sealed class FeedbackAnalysisProcessor(
             item.Content,
             item.Source);
 
-        return await ExecuteWithRetryAsync(
+        return await ExecuteAiOperationWithRetryAsync(
+            "feedback_analysis",
             token => llmClient.AnalyzeFeedbackAsync(request, token),
             cancellationToken);
     }
@@ -111,16 +127,19 @@ internal sealed class FeedbackAnalysisProcessor(
     {
         var request = new FeedbackEmbeddingRequest(feedbackId, embeddingInput);
 
-        return await ExecuteWithRetryAsync(
+        return await ExecuteAiOperationWithRetryAsync(
+            "embedding_generation",
             token => llmClient.GenerateEmbeddingAsync(request, token),
             cancellationToken);
     }
 
-    private async Task<(T Result, int Attempts)> ExecuteWithRetryAsync<T>(
+    private async Task<(T Result, int Attempts)> ExecuteAiOperationWithRetryAsync<T>(
+        string operationName,
         Func<CancellationToken, Task<T>> operation,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(operation);
+        using var activity = PulsePilotTelemetry.StartAiOperation(operationName);
 
         for (var attempt = 1; attempt <= _options.MaxAttempts; attempt++)
         {
@@ -132,6 +151,10 @@ internal sealed class FeedbackAnalysisProcessor(
                     _options.AnalysisTimeoutSeconds));
 
                 var result = await operation(timeoutSource.Token);
+                PulsePilotTelemetry.RecordAiAttempt(operationName, "succeeded");
+                activity?.SetTag("pulsepilot.attempts", attempt);
+                activity?.SetTag("pulsepilot.outcome", "succeeded");
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Ok);
 
                 return (result, attempt);
             }
@@ -139,26 +162,62 @@ internal sealed class FeedbackAnalysisProcessor(
             {
                 if (!exception.IsTransient || attempt == _options.MaxAttempts)
                 {
+                    PulsePilotTelemetry.RecordAiAttempt(
+                        operationName,
+                        "failed",
+                        exception.FailureKind);
+                    PulsePilotTelemetry.RecordAiOperationFailed(
+                        activity,
+                        attempt,
+                        exception.FailureKind);
                     throw new AnalysisFailedException(
                         exception.FailureKind,
                         attempt);
                 }
+
+                PulsePilotTelemetry.RecordAiAttempt(
+                    operationName,
+                    "retryable_failure",
+                    exception.FailureKind);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 if (attempt == _options.MaxAttempts)
                 {
+                    PulsePilotTelemetry.RecordAiAttempt(
+                        operationName,
+                        "failed",
+                        LlmProviderFailureKind.ProviderUnavailable);
+                    PulsePilotTelemetry.RecordAiOperationFailed(
+                        activity,
+                        attempt,
+                        LlmProviderFailureKind.ProviderUnavailable);
                     throw new AnalysisFailedException(
                         LlmProviderFailureKind.ProviderUnavailable,
                         attempt);
                 }
+
+                PulsePilotTelemetry.RecordAiAttempt(
+                    operationName,
+                    "retryable_failure",
+                    LlmProviderFailureKind.ProviderUnavailable);
             }
             catch (OperationCanceledException)
             {
+                PulsePilotTelemetry.RecordAiAttempt(operationName, "cancelled");
+                activity?.SetTag("pulsepilot.outcome", "cancelled");
                 throw;
             }
             catch (Exception)
             {
+                PulsePilotTelemetry.RecordAiAttempt(
+                    operationName,
+                    "failed",
+                    LlmProviderFailureKind.ProviderFailure);
+                PulsePilotTelemetry.RecordAiOperationFailed(
+                    activity,
+                    attempt,
+                    LlmProviderFailureKind.ProviderFailure);
                 throw new AnalysisFailedException(
                     LlmProviderFailureKind.ProviderFailure,
                     attempt);

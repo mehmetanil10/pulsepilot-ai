@@ -31,6 +31,8 @@ x-api-environment: &api-environment
   OpenAI__Endpoint: ${OPENAI_ENDPOINT:-https://api.openai.com/v1/}
   OpenAI__MaxOutputTokenCount: ${OPENAI_MAX_OUTPUT_TOKENS:-1000}
   OpenAI__NetworkTimeoutSeconds: ${OPENAI_NETWORK_TIMEOUT_SECONDS:-30}
+  OpenTelemetry__OtlpEnabled: ${OTEL_EXPORTER_OTLP_ENABLED:-false}
+  OpenTelemetry__OtlpEndpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4317}
   SemanticSearch__SimilarityThreshold: ${SIMILARITY_THRESHOLD:-0.80}
   SemanticSearch__DefaultLimit: ${SIMILARITY_DEFAULT_LIMIT:-10}
   SemanticSearch__MaxLimit: ${SIMILARITY_MAX_LIMIT:-50}

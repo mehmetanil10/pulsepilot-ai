@@ -41,6 +41,10 @@ Responses function calling, and four allowlisted analytical tools while keeping
 workspace identity under backend control. EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
+API and Worker hosts now share an OpenTelemetry pipeline for ASP.NET Core,
+outbound HTTP, PostgreSQL, .NET runtime, feedback processing, AI retry attempts,
+and human action reviews. OTLP export is explicit opt-in, so local development
+does not require a collector.
 Sprint 4 now also includes a versioned, synthetic bilingual golden dataset for
 measuring feedback-analysis quality without sending customer data to an external
 provider.
@@ -97,6 +101,30 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 Use `-SkipImageBuild` for a faster rerun when the application images are already
 current. The script always removes its temporary containers, network, and volume.
+
+## OpenTelemetry
+
+PulsePilot emits distributed traces and metrics from both backend hosts. API
+request spans connect to application workflow, outbound AI HTTP, and PostgreSQL
+spans; the Worker emits the same workflow and dependency telemetry without an
+HTTP parent. Custom metrics use bounded, PII-safe dimensions:
+
+- `pulsepilot.feedback.processing.count`
+- `pulsepilot.feedback.processing.duration`
+- `pulsepilot.ai.attempt.count`
+- `pulsepilot.pending_action.review.count`
+
+OTLP export is disabled by default. To send telemetry to an OpenTelemetry
+Collector or compatible backend, set these values in `.env` before starting the
+Compose stack:
+
+```dotenv
+OTEL_EXPORTER_OTLP_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4317
+```
+
+The endpoint must be an absolute HTTP or HTTPS URI. Telemetry attributes never
+include feedback text, customer names, email addresses, API keys, or JWTs.
 
 ## AI evaluation dataset
 
