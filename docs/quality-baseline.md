@@ -35,7 +35,7 @@ Use `-SkipImageBuild` only when the application images are already current. The
 script tears down its containers, network, and PostgreSQL volume even when a test
 fails.
 
-## Current measured baseline
+## Task 44 measured baseline
 
 Captured on 2026-08-22 in Release configuration with .NET SDK 10.0.303. All 301
 quality-baseline tests and both Playwright acceptance scenarios passed; none were
@@ -115,6 +115,12 @@ images, enforces the container contract, runs the Chromium journey, and rejects
 fixable critical/high image vulnerabilities. NuGet and npm advisory checks,
 immutable Action references, short-lived diagnostic artifacts, least-privilege
 workflow permissions, and weekly Dependabot review complete the CI baseline.
+
+Task 45 adds six integration tests for safe Render/PostgreSQL URL normalization
+and four Web tests for runtime private-service address handling, ratcheting the
+suite from 301 to 311 tests. The deployment artifact, Blueprint wiring, public
+smoke contract, and fifth Trivy image gate add release evidence without lowering
+the Task 44 coverage floors.
 
 ## Regression floors
 

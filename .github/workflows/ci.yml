@@ -130,6 +130,10 @@ jobs:
         shell: pwsh
         run: ./scripts/build-container-image.ps1 -Service web
 
+      - name: Build Render deployment image
+        shell: pwsh
+        run: ./scripts/build-container-image.ps1 -Service render
+
       - name: Validate container hardening
         shell: pwsh
         run: ./scripts/validate-container-hardening.ps1
@@ -192,6 +196,19 @@ jobs:
           ignore-unfixed: true
           format: sarif
           output: artifacts/security/trivy-web.sarif
+          exit-code: "1"
+
+      - name: Scan Render deployment image
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: pulsepilot-render:${{ env.IMAGE_TAG }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          format: sarif
+          output: artifacts/security/trivy-render.sarif
           exit-code: "1"
 
       - name: Upload container and E2E reports

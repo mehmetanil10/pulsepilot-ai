@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("migration", "api", "worker", "web")]
+    [ValidateSet("migration", "api", "worker", "web", "render")]
     [string]$Service
 )
 
@@ -16,9 +16,22 @@ New-Item -ItemType Directory -Path $artifactDirectory -Force | Out-Null
 
 Push-Location $repositoryRoot
 try {
-    Write-Host "> docker compose build --progress plain $Service" -ForegroundColor DarkGray
-    & docker compose build --progress plain $Service 2>&1 |
-        Tee-Object -FilePath $logPath
+    if ($Service -eq "render") {
+        if ([string]::IsNullOrWhiteSpace($env:IMAGE_TAG)) {
+            throw "IMAGE_TAG is required for the Render deployment image."
+        }
+
+        Write-Host "> docker build --progress plain --target render-final --tag pulsepilot-render:$env:IMAGE_TAG ." -ForegroundColor DarkGray
+        & docker build --progress plain `
+            --target render-final `
+            --tag "pulsepilot-render:$env:IMAGE_TAG" `
+            . 2>&1 | Tee-Object -FilePath $logPath
+    }
+    else {
+        Write-Host "> docker compose build --progress plain $Service" -ForegroundColor DarkGray
+        & docker compose build --progress plain $Service 2>&1 |
+            Tee-Object -FilePath $logPath
+    }
     $exitCode = $LASTEXITCODE
 
     if ($exitCode -ne 0) {

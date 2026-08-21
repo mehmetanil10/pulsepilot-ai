@@ -51,6 +51,8 @@ public static class DependencyInjection
                     $"Connection string '{DatabaseConnectionStringName}' is required.");
             }
 
+            connectionString = DatabaseConnectionString.Normalize(connectionString);
+
             options.UseNpgsql(
                 connectionString,
                 npgsqlOptions =>

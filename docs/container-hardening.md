@@ -25,6 +25,11 @@ boundary.
   revision, version, creation-time, title, and description labels.
 - The one-shot migration has its own target and image. It does not inherit the
   long-running API health check.
+- The Dockerfile's default `render-final` stage combines the API and Worker
+  publish outputs for Render. The platform starts the API by default, invokes
+  the same API artifact for pre-deploy migration/seed, and overrides only the
+  Worker command. Local Compose continues to use the smaller role-specific
+  stages.
 
 ## Compose runtime baseline
 
