@@ -196,9 +196,9 @@ the API remains the authorization and idempotency boundary.
 
 ## Demo seed data
 
-Demo data is disabled by default. To create a demo owner, workspace, and at least
-100 realistic feedback records, set these values in `.env` before starting the
-stack:
+Demo data is disabled by default. To create a portfolio-ready product story with
+a demo owner, workspace, and at least 100 realistic feedback records, set these
+values in `.env` before starting the stack:
 
 ```dotenv
 SEED_DEMO_DATA=true
@@ -209,14 +209,27 @@ SEED_FEEDBACK_COUNT=100
 
 The one-shot migration service applies migrations first and then seeds the demo
 workspace. Re-running it with the same database updates the demo account when
-needed and only adds feedback until the configured target is reached, so records
-are not duplicated. The feedback count must be between 100 and 10,000. The demo
-password is required only when seeding is enabled and must never be committed.
+needed and only fills missing story records, so feedback, analyses, clusters,
+actions, backlog items, and response drafts are not duplicated. Existing raw
+demo workspaces are upgraded in place. No external AI provider is called while
+seeding. The feedback count must be between 100 and 10,000. The demo password is
+required only when seeding is enabled and must never be committed.
 
 After the API becomes healthy, sign in through `POST /api/auth/login` with the
 configured demo email and password. The generated feedback spans Payments,
-Authentication, Dashboard, Mobile, Reporting, Performance, and Feature Requests,
-with intentionally related reports for semantic search and later clustering work.
+Authentication, Dashboard, Mobile, Reporting, Performance, and Feature Requests.
+With the default 100-record seed, the deterministic scenario contains 84
+completed analyses, 6 visible processing failures, 10 pending records, 7
+prioritized clusters, and 42 recent cluster members. Recent membership is
+intentionally weighted so the seven-day trending dashboard contains growing
+issues instead of a flat distribution.
+
+The human-in-the-loop story includes two recommendations awaiting review, two
+approved and executed recommendations, and one rejected recommendation. One
+executed engineering recommendation produces an open backlog item; one executed
+customer-response recommendation produces a persisted but unsent draft. This
+makes `/dashboard`, `/feedback`, `/actions`, and `/backlog` useful immediately
+after the first sign-in while preserving approval as the execution boundary.
 
 ## API infrastructure
 

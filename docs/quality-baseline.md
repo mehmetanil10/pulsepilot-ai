@@ -1,7 +1,7 @@
 # Quality baseline
 
 This document records the Sprint 4 quality baseline established in Task 34 and
-ratcheted in Tasks 35 and 36. It is a regression floor, not the final coverage
+ratcheted through Task 38. It is a regression floor, not the final coverage
 target.
 
 ## Reproduce the baseline
@@ -45,7 +45,7 @@ skipped.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | .NET unit | 134 | 69.34% | 75.63% | n/a | n/a |
 | .NET Worker unit | 2 | 100.00% | 100.00% | n/a | n/a |
-| .NET integration | 81 | 92.65% | 57.85% | n/a | n/a |
+| .NET integration | 81 | 92.88% | 58.91% | n/a | n/a |
 | Web unit/component | 51 | 38.90% | 80.00% | 68.45% | 38.90% |
 | Browser acceptance | 2 | n/a | n/a | n/a | n/a |
 
@@ -66,6 +66,11 @@ Task 37 added nine deterministic runner and scoring tests and ratcheted the
 quality suite from 259 to 268 tests. They cover strict/tolerant labels,
 concept recall, failed-provider denominators, latency percentiles, gates, CLI
 validation, replay execution, and safe JSON reporting.
+
+Task 38 expanded the existing seed acceptance test without inflating the test
+count. It now exercises the complete demo story through PostgreSQL and the API,
+raising integration coverage from 92.65% lines / 57.85% branches to 92.88% lines
+/ 58.91% branches.
 
 ## Regression floors
 
@@ -100,20 +105,22 @@ only move upward as coverage improves.
 - Integration tests use disposable PostgreSQL Testcontainers and make no external
   AI provider calls.
 
-## Remaining priorities after Task 37
+## Remaining priorities after Task 38
 
 - Server-rendered page/data modules and the larger dashboard, feedback, backlog,
   and actions views still have limited direct unit coverage; the main workspace
   behavior is currently protected by the browser journey.
 - The browser suite covers authentication, feedback ingestion and inspection,
-  empty action/backlog states, safe Copilot failure, and sign-out. Deterministic
-  populated action-review and backlog UI journeys should follow the expanded demo
-  seed work in Task 38.
+  empty action/backlog states, safe Copilot failure, and sign-out. The expanded
+  seed now provides deterministic populated action-review and backlog data; a
+  browser journey that consumes that seeded state remains a targeted follow-up.
 - Branch coverage trails line coverage in the integration suite, so negative and
   authorization paths need targeted assertions rather than additional happy-path
   volume alone.
 - Real provider baselines remain opt-in because they incur network cost and can
   vary over time. Approved model/prompt results should be stored as reviewed
   release evidence rather than weakening the deterministic CI gate.
-- Task 38 should expand deterministic demo seed scenarios independently from the
-  immutable evaluation dataset.
+- The Task 38 seed acceptance test now protects its deterministic distribution,
+  idempotency, dashboard KPIs and trends, action-state mix, backlog item, and
+  unsent customer-response draft independently from the immutable evaluation
+  dataset.
