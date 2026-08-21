@@ -1,6 +1,6 @@
 {
   "dotnetUnit": {
-    "minimumTests": 125,
+    "minimumTests": 134,
     "minimumLineCoverage": 69,
     "minimumBranchCoverage": 75
   },

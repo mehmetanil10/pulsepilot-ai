@@ -37,16 +37,16 @@ fails.
 
 ## Current measured baseline
 
-Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 259
+Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 268
 quality-baseline tests and both Playwright acceptance scenarios passed; none were
 skipped.
 
 | Suite | Tests | Line coverage | Branch coverage | Function coverage | Statement coverage |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| .NET unit | 125 | 69.34% | 75.63% | n/a | n/a |
+| .NET unit | 134 | 69.34% | 75.63% | n/a | n/a |
 | .NET Worker unit | 2 | 100.00% | 100.00% | n/a | n/a |
 | .NET integration | 81 | 92.65% | 57.85% | n/a | n/a |
-| Web unit/component | 51 | 38.90% | 80.10% | 68.45% | 38.90% |
+| Web unit/component | 51 | 38.90% | 80.00% | 68.45% | 38.90% |
 | Browser acceptance | 2 | n/a | n/a | n/a | n/a |
 
 Coverage percentages are suite-specific and must not be averaged together.
@@ -62,6 +62,11 @@ quality suite from 256 to 259 tests. The tests validate the 60-case bilingual AI
 evaluation dataset without making provider calls, so product-code coverage is
 unchanged by design.
 
+Task 37 added nine deterministic runner and scoring tests and ratcheted the
+quality suite from 259 to 268 tests. They cover strict/tolerant labels,
+concept recall, failed-provider denominators, latency percentiles, gates, CLI
+validation, replay execution, and safe JSON reporting.
+
 ## Regression floors
 
 `quality-gates.json` contains deliberately conservative, whole-percentage floors
@@ -70,7 +75,7 @@ filtering of test cases, while coverage floors prevent meaningful regressions.
 
 | Suite | Minimum tests | Minimum lines | Minimum branches | Minimum functions | Minimum statements |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| .NET unit | 125 | 69% | 75% | n/a | n/a |
+| .NET unit | 134 | 69% | 75% | n/a | n/a |
 | .NET Worker unit | 2 | 100% | 100% | n/a | n/a |
 | .NET integration | 81 | 92% | 57% | n/a | n/a |
 | Web unit/component | 51 | 38% | 80% | 68% | 38% |
@@ -95,7 +100,7 @@ only move upward as coverage improves.
 - Integration tests use disposable PostgreSQL Testcontainers and make no external
   AI provider calls.
 
-## Remaining priorities after Task 36
+## Remaining priorities after Task 37
 
 - Server-rendered page/data modules and the larger dashboard, feedback, backlog,
   and actions views still have limited direct unit coverage; the main workspace
@@ -107,6 +112,8 @@ only move upward as coverage improves.
 - Branch coverage trails line coverage in the integration suite, so negative and
   authorization paths need targeted assertions rather than additional happy-path
   volume alone.
-- Task 37 must run the versioned golden dataset against a configured provider and
-  report strict/tolerant accuracy, text-concept recall, contract validity,
-  latency, and cost without weakening the deterministic CI baseline.
+- Real provider baselines remain opt-in because they incur network cost and can
+  vary over time. Approved model/prompt results should be stored as reviewed
+  release evidence rather than weakening the deterministic CI gate.
+- Task 38 should expand deterministic demo seed scenarios independently from the
+  immutable evaluation dataset.

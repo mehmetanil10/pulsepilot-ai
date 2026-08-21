@@ -54,6 +54,7 @@ provider.
 - `PulsePilot.Worker`: durable background feedback analysis host
 - `PulsePilot.Web`: Next.js App Router frontend and secure backend gateway
 - `evaluation`: versioned AI evaluation datasets, manifests, and JSON schemas
+- `PulsePilot.Evaluation`: provider-neutral evaluation runner and metrics CLI
 - `PulsePilot.UnitTests`: domain and application tests
 - `PulsePilot.Worker.UnitTests`: background worker host tests
 - `PulsePilot.IntegrationTests`: API and infrastructure tests
@@ -99,12 +100,14 @@ current. The script always removes its temporary containers, network, and volume
 
 ## AI evaluation dataset
 
-The Task 36 golden dataset contains 60 synthetic feedback-analysis cases: 30 in
-English and 30 in Turkish. It covers clear, mixed, ambiguous, noisy, adversarial,
-synthetic-PII, and minimal-input scenarios while remaining deterministic and
-provider-free in CI. Its contract, data policy, and versioning rules are
-documented in `evaluation/README.md`. Provider execution and scoring belong to
-Task 37.
+The golden dataset contains 60 synthetic feedback-analysis cases: 30 in English
+and 30 in Turkish. It covers clear, mixed, ambiguous, noisy, adversarial,
+synthetic-PII, and minimal-input scenarios. The Task 37 CLI now produces strict
+and tolerant accuracy, severity, concept-recall, contract-validity, latency,
+language/scenario breakdown, and configurable regression-gate metrics. Replay
+mode remains deterministic and provider-free; real OpenAI evaluation is explicit
+opt-in through `OPENAI_API_KEY`. Usage and commands are documented in
+`evaluation/README.md`.
 
 ## Docker setup
 

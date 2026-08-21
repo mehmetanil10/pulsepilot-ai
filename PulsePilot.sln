@@ -23,6 +23,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PulsePilot.IntegrationTests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PulsePilot.Worker.UnitTests", "tests\PulsePilot.Worker.UnitTests\PulsePilot.Worker.UnitTests.csproj", "{BA025CBE-425C-4E23-B55A-2588A8241800}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{07C2787E-EAC7-C090-1BA3-A61EC2A24D84}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PulsePilot.Evaluation", "tools\PulsePilot.Evaluation\PulsePilot.Evaluation.csproj", "{CE200E4C-CB49-486A-B129-82A7B95172A6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -129,6 +133,18 @@ Global
 		{BA025CBE-425C-4E23-B55A-2588A8241800}.Release|x64.Build.0 = Release|Any CPU
 		{BA025CBE-425C-4E23-B55A-2588A8241800}.Release|x86.ActiveCfg = Release|Any CPU
 		{BA025CBE-425C-4E23-B55A-2588A8241800}.Release|x86.Build.0 = Release|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Debug|x64.Build.0 = Debug|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Debug|x86.Build.0 = Debug|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Release|x64.ActiveCfg = Release|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Release|x64.Build.0 = Release|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Release|x86.ActiveCfg = Release|Any CPU
+		{CE200E4C-CB49-486A-B129-82A7B95172A6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -142,5 +158,6 @@ Global
 		{DEEFDBEC-6511-4581-9E37-80EABE2FFB3C} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{56FAA303-043F-4413-A011-CC9C37681381} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{BA025CBE-425C-4E23-B55A-2588A8241800} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{CE200E4C-CB49-486A-B129-82A7B95172A6} = {07C2787E-EAC7-C090-1BA3-A61EC2A24D84}
 	EndGlobalSection
 EndGlobal
