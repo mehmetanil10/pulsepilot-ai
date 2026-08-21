@@ -97,6 +97,14 @@ public sealed class AuthenticationEndpointTests(PostgreSqlFixture database)
         using var document = JsonDocument.Parse(
             await duplicateResponse.Content.ReadAsStreamAsync());
         Assert.Equal("Conflict", document.RootElement.GetProperty("title").GetString());
+        Assert.Equal("conflict", document.RootElement.GetProperty("code").GetString());
+        Assert.Equal(
+            "The request conflicts with the current resource state.",
+            document.RootElement.GetProperty("detail").GetString());
+        Assert.DoesNotContain(
+            email,
+            document.RootElement.GetRawText(),
+            StringComparison.OrdinalIgnoreCase);
         Assert.True(document.RootElement.TryGetProperty("traceId", out _));
     }
 
@@ -120,6 +128,9 @@ public sealed class AuthenticationEndpointTests(PostgreSqlFixture database)
         Assert.Equal(
             "Authentication failed",
             loginDocument.RootElement.GetProperty("title").GetString());
+        Assert.Equal(
+            "invalid_credentials",
+            loginDocument.RootElement.GetProperty("code").GetString());
         Assert.DoesNotContain(
             unknownEmail,
             loginDocument.RootElement.GetRawText(),
@@ -130,5 +141,8 @@ public sealed class AuthenticationEndpointTests(PostgreSqlFixture database)
         Assert.Equal(
             "Authentication required",
             challengeDocument.RootElement.GetProperty("title").GetString());
+        Assert.Equal(
+            "authentication_required",
+            challengeDocument.RootElement.GetProperty("code").GetString());
     }
 }

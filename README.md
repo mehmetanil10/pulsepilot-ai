@@ -235,7 +235,14 @@ after the first sign-in while preserving approval as the execution boundary.
 
 - FluentValidation validators are discovered automatically from the Application
   and API assemblies.
-- Errors use RFC-compatible Problem Details responses and include a `traceId`.
+- API, authentication, model-binding, and otherwise empty `4xx`/`5xx` failures
+  use one RFC-compatible Problem Details contract. Responses include stable
+  `type`, `code`, and `traceId` values, expose the request path without its query
+  string, and are marked `no-store` and `nosniff`.
+- Unexpected, provider, persistence-concurrency, not-found, conflict, malformed
+  request, and domain failures use allow-listed public messages. Exception
+  messages and stack traces remain server-side; validation failures retain only
+  intentional field-level guidance.
 - Serilog emits structured request and application logs to the console.
 - Swagger UI is available at `/swagger` in the Development environment.
 - `/health/live` checks process liveness; `/health/ready` also checks PostgreSQL.

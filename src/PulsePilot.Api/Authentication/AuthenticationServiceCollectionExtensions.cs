@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using PulsePilot.Api.ErrorHandling;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Authentication;
 
@@ -117,13 +118,14 @@ public static class AuthenticationServiceCollectionExtensions
         return problemDetailsService.WriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = statusCode,
-                Title = title,
-                Detail = detail,
-                Instance = httpContext.Request.Path,
-            },
+            ProblemDetails = ApiProblemDetailsFactory.Create(
+                httpContext,
+                statusCode,
+                title,
+                detail,
+                statusCode == StatusCodes.Status401Unauthorized
+                    ? "authentication_required"
+                    : "access_denied"),
         }).AsTask();
     }
 }

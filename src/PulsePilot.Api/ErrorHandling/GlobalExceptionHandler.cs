@@ -51,69 +51,77 @@ public sealed class GlobalExceptionHandler(
         return true;
     }
 
-    private static ProblemDetails CreateProblemDetails(HttpContext httpContext, Exception exception)
+    private static ProblemDetails CreateProblemDetails(
+        HttpContext httpContext,
+        Exception exception)
     {
-        ProblemDetails problemDetails = exception switch
+        return exception switch
         {
-            ValidationException validationException => CreateValidationProblemDetails(validationException),
-            InvalidCredentialsException => CreateKnownProblemDetails(
+            ValidationException validationException => CreateValidationProblemDetails(
+                httpContext,
+                validationException),
+            InvalidCredentialsException => ApiProblemDetailsFactory.Create(
+                httpContext,
                 StatusCodes.Status401Unauthorized,
                 "Authentication failed",
-                exception.Message),
-            NotFoundException => CreateKnownProblemDetails(
+                "The email address or password is incorrect.",
+                "invalid_credentials"),
+            NotFoundException => ApiProblemDetailsFactory.Create(
+                httpContext,
                 StatusCodes.Status404NotFound,
                 "Resource not found",
-                exception.Message),
-            ForbiddenException => CreateKnownProblemDetails(
+                "The requested resource could not be found.",
+                "not_found"),
+            ForbiddenException => ApiProblemDetailsFactory.Create(
+                httpContext,
                 StatusCodes.Status403Forbidden,
                 "Access denied",
-                exception.Message),
-            ConcurrencyConflictException => CreateKnownProblemDetails(
+                "The authenticated user is not allowed to perform this operation.",
+                "access_denied"),
+            ConcurrencyConflictException => ApiProblemDetailsFactory.Create(
+                httpContext,
+                StatusCodes.Status409Conflict,
+                "Concurrent update conflict",
+                "The resource changed while the request was being processed. Retry the operation.",
+                "concurrency_conflict"),
+            ConflictException => ApiProblemDetailsFactory.Create(
+                httpContext,
                 StatusCodes.Status409Conflict,
                 "Conflict",
-                exception.Message),
-            ConflictException => CreateKnownProblemDetails(
-                StatusCodes.Status409Conflict,
-                "Conflict",
-                exception.Message),
-            LlmProviderException llmException => CreateKnownProblemDetails(
+                "The request conflicts with the current resource state.",
+                "conflict"),
+            LlmProviderException llmException => ApiProblemDetailsFactory.Create(
+                httpContext,
                 llmException.IsTransient
                     || llmException.FailureKind == LlmProviderFailureKind.NotConfigured
                     ? StatusCodes.Status503ServiceUnavailable
                     : StatusCodes.Status502BadGateway,
                 "AI provider unavailable",
-                "The AI provider could not produce the requested output."),
-            DomainException => CreateKnownProblemDetails(
+                "The AI provider could not produce the requested output.",
+                "ai_provider_unavailable"),
+            DomainException => ApiProblemDetailsFactory.Create(
+                httpContext,
                 StatusCodes.Status422UnprocessableEntity,
                 "Business rule violation",
-                exception.Message),
-            BadHttpRequestException => CreateKnownProblemDetails(
+                "The request cannot be completed because a business rule was violated.",
+                "business_rule_violation"),
+            BadHttpRequestException => ApiProblemDetailsFactory.Create(
+                httpContext,
                 StatusCodes.Status400BadRequest,
                 "Bad request",
-                exception.Message),
-            _ => CreateKnownProblemDetails(
+                "The request body or parameters could not be read.",
+                "bad_request"),
+            _ => ApiProblemDetailsFactory.Create(
+                httpContext,
                 StatusCodes.Status500InternalServerError,
                 "An unexpected error occurred",
-                "The server could not complete the request."),
-        };
-
-        problemDetails.Instance = httpContext.Request.Path;
-        problemDetails.Extensions["traceId"] = httpContext.TraceIdentifier;
-
-        return problemDetails;
-    }
-
-    private static ProblemDetails CreateKnownProblemDetails(int status, string title, string detail)
-    {
-        return new ProblemDetails
-        {
-            Status = status,
-            Title = title,
-            Detail = detail,
+                "The server could not complete the request.",
+                "internal_error"),
         };
     }
 
     private static HttpValidationProblemDetails CreateValidationProblemDetails(
+        HttpContext httpContext,
         ValidationException exception)
     {
         var errors = exception.Errors
@@ -122,11 +130,6 @@ public sealed class GlobalExceptionHandler(
                 group => group.Key,
                 group => group.Select(error => error.ErrorMessage).Distinct().ToArray());
 
-        return new HttpValidationProblemDetails(errors)
-        {
-            Status = StatusCodes.Status400BadRequest,
-            Title = "Validation failed",
-            Detail = "One or more validation errors occurred.",
-        };
+        return ApiProblemDetailsFactory.CreateValidation(httpContext, errors);
     }
 }

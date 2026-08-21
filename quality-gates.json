@@ -10,9 +10,9 @@
     "minimumBranchCoverage": 100
   },
   "dotnetIntegration": {
-    "minimumTests": 81,
-    "minimumLineCoverage": 92,
-    "minimumBranchCoverage": 57
+    "minimumTests": 86,
+    "minimumLineCoverage": 93,
+    "minimumBranchCoverage": 59
   },
   "web": {
     "minimumTests": 51,

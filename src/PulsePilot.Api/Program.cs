@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.OpenApi;
 using PulsePilot.Api.Authentication;
@@ -27,13 +28,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddProblemDetails(options =>
 {
-    options.CustomizeProblemDetails = context =>
-    {
-        context.ProblemDetails.Instance ??= context.HttpContext.Request.Path;
-        context.ProblemDetails.Extensions.TryAdd(
-            "traceId",
-            context.HttpContext.TraceIdentifier);
-    };
+    options.CustomizeProblemDetails = ApiProblemDetailsFactory.Customize;
 });
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddJwtAuthentication();
@@ -44,6 +39,19 @@ builder.Services.AddControllers(options =>
     options.Filters.AddService<FluentValidationActionFilter>())
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(
         new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false)));
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var problemDetails = ApiProblemDetailsFactory.CreateModelBindingValidation(
+            context.HttpContext,
+            context.ModelState.Keys);
+        var result = new BadRequestObjectResult(problemDetails);
+        result.ContentTypes.Add("application/problem+json");
+
+        return result;
+    };
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -94,6 +102,7 @@ if (runMigrations || runDemoSeed)
 
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
+app.UseStatusCodePages();
 
 if (app.Environment.IsDevelopment())
 {
