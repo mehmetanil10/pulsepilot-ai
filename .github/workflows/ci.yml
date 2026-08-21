@@ -113,9 +113,18 @@ jobs:
           "BUILD_REVISION=${{ github.sha }}" >> $env:GITHUB_ENV
           "BUILD_VERSION=ci-${{ github.run_number }}" >> $env:GITHUB_ENV
 
-      - name: Build production images
+      - name: Build migration image
+        run: docker compose build --progress plain migration
+
+      - name: Build API image
+        run: docker compose build --progress plain api
+
+      - name: Build Worker image
+        run: docker compose build --progress plain worker
+
+      - name: Build Web image
         id: build
-        run: docker compose build migration api worker web
+        run: docker compose build --progress plain web
 
       - name: Validate container hardening
         shell: pwsh
