@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using PulsePilot.Api.Protection;
 using PulsePilot.Application.Copilot;
 
 namespace PulsePilot.Api.Controllers;
@@ -11,6 +13,7 @@ public sealed class CopilotController(ICopilotChatService copilotChatService)
     : ControllerBase
 {
     [HttpPost("chat")]
+    [EnableRateLimiting(ApiRateLimitPolicies.Ai)]
     [ProducesResponseType<CopilotChatResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]

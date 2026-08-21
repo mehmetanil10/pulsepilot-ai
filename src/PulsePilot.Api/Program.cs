@@ -9,6 +9,7 @@ using PulsePilot.Api.Authentication;
 using PulsePilot.Api.Database;
 using PulsePilot.Api.ErrorHandling;
 using PulsePilot.Api.HealthChecks;
+using PulsePilot.Api.Protection;
 using PulsePilot.Api.Validation;
 using PulsePilot.Application;
 using PulsePilot.Infrastructure;
@@ -38,6 +39,7 @@ builder.Services.AddProblemDetails(options =>
 });
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddJwtAuthentication();
+builder.Services.AddApiProtection(builder.Configuration);
 
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddScoped<FluentValidationActionFilter>();
@@ -109,6 +111,7 @@ if (runMigrations || runDemoSeed)
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseApiSecurityHeaders();
 
 if (app.Environment.IsDevelopment())
 {
@@ -118,6 +121,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions

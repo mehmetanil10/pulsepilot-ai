@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using PulsePilot.Api.Protection;
 using PulsePilot.Application.Reports;
 using PulsePilot.Application.Tools;
 
@@ -12,6 +14,7 @@ public sealed class ReportsController(IWeeklyReportService weeklyReportService)
     : ControllerBase
 {
     [HttpPost("weekly")]
+    [EnableRateLimiting(ApiRateLimitPolicies.Ai)]
     [ProducesResponseType<GenerateReportToolResult>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status502BadGateway)]

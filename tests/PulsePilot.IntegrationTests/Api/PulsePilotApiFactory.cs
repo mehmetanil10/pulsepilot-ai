@@ -8,7 +8,8 @@ namespace PulsePilot.IntegrationTests.Api;
 
 public sealed class PulsePilotApiFactory(
     string connectionString,
-    Action<IServiceCollection>? configureTestServices = null)
+    Action<IServiceCollection>? configureTestServices = null,
+    IReadOnlyDictionary<string, string?>? configurationOverrides = null)
     : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -24,6 +25,14 @@ public sealed class PulsePilotApiFactory(
                 ["Jwt:Secret"] = "integration-test-secret-at-least-32-bytes-long",
                 ["Jwt:ExpirationMinutes"] = "60",
             };
+
+            if (configurationOverrides is not null)
+            {
+                foreach (var (key, value) in configurationOverrides)
+                {
+                    values[key] = value;
+                }
+            }
 
             configurationBuilder.AddInMemoryCollection(values);
         });

@@ -33,6 +33,13 @@ x-api-environment: &api-environment
   OpenAI__NetworkTimeoutSeconds: ${OPENAI_NETWORK_TIMEOUT_SECONDS:-30}
   OpenTelemetry__OtlpEnabled: ${OTEL_EXPORTER_OTLP_ENABLED:-false}
   OpenTelemetry__OtlpEndpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4317}
+  ApiProtection__RateLimitingEnabled: ${API_RATE_LIMITING_ENABLED:-true}
+  ApiProtection__GeneralPermitLimit: ${API_GENERAL_PERMIT_LIMIT:-240}
+  ApiProtection__AuthenticationPermitLimit: ${API_AUTH_PERMIT_LIMIT:-10}
+  ApiProtection__AiPermitLimit: ${API_AI_PERMIT_LIMIT:-20}
+  ApiProtection__WindowSeconds: ${API_RATE_LIMIT_WINDOW_SECONDS:-60}
+  ApiProtection__QueueLimit: ${API_RATE_LIMIT_QUEUE_LIMIT:-0}
+  ApiProtection__MaxRequestBodyBytes: ${API_MAX_REQUEST_BODY_BYTES:-65536}
   SemanticSearch__SimilarityThreshold: ${SIMILARITY_THRESHOLD:-0.80}
   SemanticSearch__DefaultLimit: ${SIMILARITY_DEFAULT_LIMIT:-10}
   SemanticSearch__MaxLimit: ${SIMILARITY_MAX_LIMIT:-50}

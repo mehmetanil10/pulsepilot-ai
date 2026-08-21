@@ -1,7 +1,7 @@
 # Quality baseline
 
 This document records the Sprint 4 quality baseline established in Task 34 and
-ratcheted through Task 41. It is a regression floor, not the final coverage
+ratcheted through Task 42. It is a regression floor, not the final coverage
 target.
 
 ## Reproduce the baseline
@@ -37,7 +37,7 @@ fails.
 
 ## Current measured baseline
 
-Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 297
+Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 301
 quality-baseline tests and both Playwright acceptance scenarios passed; none were
 skipped.
 
@@ -45,7 +45,7 @@ skipped.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | .NET unit | 149 | 70.98% | 78.34% | n/a | n/a |
 | .NET Worker unit | 2 | 100.00% | 100.00% | n/a | n/a |
-| .NET integration | 95 | 93.38% | 60.33% | n/a | n/a |
+| .NET integration | 99 | 93.55% | 61.07% | n/a | n/a |
 | Web unit/component | 51 | 38.90% | 80.10% | 68.45% | 38.90% |
 | Browser acceptance | 2 | n/a | n/a | n/a | n/a |
 
@@ -93,6 +93,14 @@ human review decisions, host provider registration, and invalid OTLP endpoint
 rejection. API and Worker share ASP.NET Core, HTTP, runtime, PostgreSQL, custom
 trace, and metric instrumentation while OTLP export remains explicit opt-in.
 
+Task 42 added four deterministic protection and performance tests and ratcheted
+the suite from 297 to 301 tests. The API tests protect scoped security headers,
+safe `429 ProblemDetails`, health-probe rate-limit bypass, and configured request
+body limits. A PostgreSQL command-budget test proves the dashboard statistics
+snapshot remains correct while using exactly two reader commands instead of the
+previous eight sequential queries. Integration coverage increased to 93.55%
+lines and 61.07% branches.
+
 ## Regression floors
 
 `quality-gates.json` contains deliberately conservative, whole-percentage floors
@@ -103,7 +111,7 @@ filtering of test cases, while coverage floors prevent meaningful regressions.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | .NET unit | 149 | 70% | 78% | n/a | n/a |
 | .NET Worker unit | 2 | 100% | 100% | n/a | n/a |
-| .NET integration | 95 | 93% | 60% | n/a | n/a |
+| .NET integration | 99 | 93% | 60% | n/a | n/a |
 | Web unit/component | 51 | 38% | 80% | 68% | 38% |
 
 A failed command, failed test, missing report, lower test count, or coverage
@@ -126,7 +134,7 @@ only move upward as coverage improves.
 - Integration tests use disposable PostgreSQL Testcontainers and make no external
   AI provider calls.
 
-## Remaining priorities after Task 41
+## Remaining priorities after Task 42
 
 - Server-rendered page/data modules and the larger dashboard, feedback, backlog,
   and actions views still have limited direct unit coverage; the main workspace
@@ -145,3 +153,7 @@ only move upward as coverage improves.
   idempotency, dashboard KPIs and trends, action-state mix, backlog item, and
   unsent customer-response draft independently from the immutable evaluation
   dataset.
+- The local load baseline is intentionally not a universal service-level
+  objective. Task 43 must repeat it against the hardened production containers,
+  and Task 45 must establish environment-specific latency and capacity targets
+  behind the deployed edge proxy.

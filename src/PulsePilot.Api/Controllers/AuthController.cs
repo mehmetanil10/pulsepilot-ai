@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using PulsePilot.Api.Authentication;
+using PulsePilot.Api.Protection;
 using PulsePilot.Application.Abstractions.Authentication;
 using PulsePilot.Application.Authentication;
 
@@ -13,6 +15,7 @@ public sealed class AuthController(
     ICurrentUserContext currentUser) : ControllerBase
 {
     [AllowAnonymous]
+    [EnableRateLimiting(ApiRateLimitPolicies.Authentication)]
     [HttpPost("register")]
     [ProducesResponseType<AuthenticationResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -27,6 +30,7 @@ public sealed class AuthController(
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting(ApiRateLimitPolicies.Authentication)]
     [HttpPost("login")]
     [ProducesResponseType<AuthenticationResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]

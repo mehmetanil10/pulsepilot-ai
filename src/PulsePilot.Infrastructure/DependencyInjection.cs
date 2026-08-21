@@ -3,6 +3,7 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -61,6 +62,9 @@ public static class DependencyInjection
                         maxRetryDelay: TimeSpan.FromSeconds(5),
                         errorCodesToAdd: null);
                 });
+
+            var interceptors = serviceProvider.GetServices<IInterceptor>();
+            options.AddInterceptors(interceptors);
         });
 
         services.Configure<DemoSeedOptions>(

@@ -126,6 +126,25 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://host.docker.internal:4317
 The endpoint must be an absolute HTTP or HTTPS URI. Telemetry attributes never
 include feedback text, customer names, email addresses, API keys, or JWTs.
 
+## Performance and API protection
+
+The API applies configurable fixed-window limits globally and stricter policies
+to authentication and AI-backed endpoints. It also caps request bodies, emits
+safe `429 ProblemDetails` responses, and adds API security headers. The dashboard
+statistics hot path uses two conditional-aggregate SQL queries instead of eight
+sequential round trips.
+
+Run the local concurrent performance gate against a started stack:
+
+```powershell
+node .\scripts\performance-baseline.mjs `
+  --requests 1000 --concurrency 50 --max-p95-ms 150
+```
+
+Measured results, security boundary decisions, configuration details, and the
+authenticated-run option are documented in
+[`docs/performance-security-baseline.md`](docs/performance-security-baseline.md).
+
 ## AI evaluation dataset
 
 The golden dataset contains 60 synthetic feedback-analysis cases: 30 in English
