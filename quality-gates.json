@@ -12,7 +12,7 @@
   "dotnetIntegration": {
     "minimumTests": 99,
     "minimumLineCoverage": 93,
-    "minimumBranchCoverage": 60
+    "minimumBranchCoverage": 61
   },
   "web": {
     "minimumTests": 51,

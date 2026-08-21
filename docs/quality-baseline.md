@@ -1,7 +1,7 @@
 # Quality baseline
 
 This document records the Sprint 4 quality baseline established in Task 34 and
-ratcheted through Task 42. It is a regression floor, not the final coverage
+ratcheted through Task 43. It is a regression floor, not the final coverage
 target.
 
 ## Reproduce the baseline
@@ -37,7 +37,7 @@ fails.
 
 ## Current measured baseline
 
-Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 301
+Captured on 2026-08-22 in Release configuration with .NET SDK 10.0.303. All 301
 quality-baseline tests and both Playwright acceptance scenarios passed; none were
 skipped.
 
@@ -45,7 +45,7 @@ skipped.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | .NET unit | 149 | 70.98% | 78.34% | n/a | n/a |
 | .NET Worker unit | 2 | 100.00% | 100.00% | n/a | n/a |
-| .NET integration | 99 | 93.55% | 61.07% | n/a | n/a |
+| .NET integration | 99 | 93.55% | 61.89% | n/a | n/a |
 | Web unit/component | 51 | 38.90% | 80.10% | 68.45% | 38.90% |
 | Browser acceptance | 2 | n/a | n/a | n/a | n/a |
 
@@ -101,6 +101,14 @@ snapshot remains correct while using exactly two reader commands instead of the
 previous eight sequential queries. Integration coverage increased to 93.55%
 lines and 61.07% branches.
 
+Task 43 keeps the 301-test code baseline unchanged and adds an executable
+container-hardening contract plus the existing two-scenario browser acceptance
+journey against the rebuilt production images. The new .NET health probe is
+compiled with the solution and exercised by Docker until API readiness; the
+image inspector protects non-root users, isolated networks, loopback ports,
+read-only roots, dropped capabilities, PID limits, OCI metadata, exec-form
+health checks, and the absence of embedded secret environment variables.
+
 ## Regression floors
 
 `quality-gates.json` contains deliberately conservative, whole-percentage floors
@@ -134,7 +142,7 @@ only move upward as coverage improves.
 - Integration tests use disposable PostgreSQL Testcontainers and make no external
   AI provider calls.
 
-## Remaining priorities after Task 42
+## Remaining priorities after Task 43
 
 - Server-rendered page/data modules and the larger dashboard, feedback, backlog,
   and actions views still have limited direct unit coverage; the main workspace

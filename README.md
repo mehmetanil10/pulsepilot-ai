@@ -197,6 +197,22 @@ The API uses JWT bearer authentication and an ephemeral Data Protection provider
 no cookie-encryption keys or application secrets are written into the image or
 container filesystem.
 
+The Compose stack defaults to `Production`, binds published ports to loopback,
+isolates PostgreSQL on an internal network, and runs application images with
+read-only roots, bounded temporary storage, no Linux capabilities, PID limits,
+and non-root users. The .NET runtime images are shell-less chiseled images; a
+dedicated .NET executable performs the API readiness check without adding curl.
+Run the executable hardening contract after building the images:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass `
+  -File .\scripts\validate-container-hardening.ps1
+```
+
+The full threat boundary, release metadata inputs, and deployment caveats are
+documented in
+[`docs/container-hardening.md`](docs/container-hardening.md).
+
 ## Web frontend
 
 The frontend lives in `src/PulsePilot.Web` and requires Node.js 20.19 or newer

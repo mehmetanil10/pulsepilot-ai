@@ -4,18 +4,48 @@ x-api-build: &api-build
   context: .
   dockerfile: Dockerfile
   target: final
+  args:
+    BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    BUILD_REVISION: ${BUILD_REVISION:-unknown}
+    BUILD_VERSION: ${BUILD_VERSION:-dev}
+
+x-migration-build: &migration-build
+  context: .
+  dockerfile: Dockerfile
+  target: migration-final
+  args:
+    BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    BUILD_REVISION: ${BUILD_REVISION:-unknown}
+    BUILD_VERSION: ${BUILD_VERSION:-dev}
 
 x-worker-build: &worker-build
   context: .
   dockerfile: Dockerfile
   target: worker-final
+  args:
+    BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    BUILD_REVISION: ${BUILD_REVISION:-unknown}
+    BUILD_VERSION: ${BUILD_VERSION:-dev}
 
 x-web-build: &web-build
   context: ./src/PulsePilot.Web
   dockerfile: Dockerfile
+  args:
+    BUILD_CREATED: ${BUILD_CREATED:-unknown}
+    BUILD_REVISION: ${BUILD_REVISION:-unknown}
+    BUILD_VERSION: ${BUILD_VERSION:-dev}
+
+x-app-hardening: &app-hardening
+  init: true
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: ${APP_PIDS_LIMIT:-256}
 
 x-api-environment: &api-environment
-  ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+  ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
   ASPNETCORE_HTTP_PORTS: "8080"
   ConnectionStrings__Database: >-
     Host=database;Port=5432;Database=${POSTGRES_DB:-pulsepilot};Username=${POSTGRES_USER:-pulsepilot};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env};Include Error Detail=false
@@ -80,13 +110,13 @@ x-api-environment: &api-environment
 
 services:
   database:
-    image: pgvector/pgvector:0.8.2-pg17-bookworm
+    image: pgvector/pgvector:0.8.2-pg17-bookworm@sha256:feb68f4f15446397d8cac7f4fe48fe4586de83160d1fc48b46283312d1a33966
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-pulsepilot}
       POSTGRES_USER: ${POSTGRES_USER:-pulsepilot}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${BIND_ADDRESS:-127.0.0.1}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -97,11 +127,19 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
+    networks:
+      - data
+    pids_limit: ${DATABASE_PIDS_LIMIT:-256}
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
+    stop_grace_period: 30s
 
   migration:
-    image: pulsepilot-api:${IMAGE_TAG:-local}
-    build: *api-build
+    <<: *app-hardening
+    image: pulsepilot-migration:${IMAGE_TAG:-local}
+    build: *migration-build
+    pull_policy: never
     environment:
       <<: *api-environment
       Database__RunMigrations: "true"
@@ -112,58 +150,59 @@ services:
     depends_on:
       database:
         condition: service_healthy
-    init: true
-    read_only: true
     tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1654,gid=1654
+    networks:
+      - data
     restart: "no"
 
   api:
+    <<: *app-hardening
     image: pulsepilot-api:${IMAGE_TAG:-local}
+    build: *api-build
     pull_policy: never
     environment:
       <<: *api-environment
       Database__RunMigrations: "false"
       Seed__Run: "false"
     ports:
-      - "${API_PORT:-8080}:8080"
+      - "${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8080}:8080"
     depends_on:
       migration:
         condition: service_completed_successfully
-    init: true
-    read_only: true
     tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1654,gid=1654
+    networks:
+      - app
+      - data
     restart: unless-stopped
     stop_grace_period: 15s
 
   web:
+    <<: *app-hardening
     image: pulsepilot-web:${IMAGE_TAG:-local}
     build: *web-build
+    pull_policy: never
     environment:
       PULSEPILOT_API_URL: http://api:8080
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:3000"
     depends_on:
       api:
         condition: service_healthy
-    init: true
-    read_only: true
     tmpfs:
-      - /tmp
-      - /app/.next/cache:uid=1001,gid=1001
-    security_opt:
-      - no-new-privileges:true
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1001,gid=1001
+      - /app/.next/cache:rw,noexec,nosuid,nodev,size=128m,uid=1001,gid=1001
+    networks:
+      - app
     restart: unless-stopped
     stop_grace_period: 15s
 
   worker:
+    <<: *app-hardening
     image: pulsepilot-worker:${IMAGE_TAG:-local}
     build: *worker-build
+    pull_policy: never
     environment:
       <<: *api-environment
       FeedbackProcessing__Enabled: ${FEEDBACK_PROCESSING_ENABLED:-false}
@@ -179,14 +218,18 @@ services:
     depends_on:
       migration:
         condition: service_completed_successfully
-    init: true
-    read_only: true
     tmpfs:
-      - /tmp
-    security_opt:
-      - no-new-privileges:true
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=1654,gid=1654
+    networks:
+      - app
+      - data
     restart: unless-stopped
     stop_grace_period: 30s
 
 volumes:
   postgres-data:
+
+networks:
+  app:
+  data:
+    internal: true
