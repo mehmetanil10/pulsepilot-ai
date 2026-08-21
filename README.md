@@ -41,6 +41,9 @@ Responses function calling, and four allowlisted analytical tools while keeping
 workspace identity under backend control. EF Core migrations and
 Testcontainers-backed API, repository, seed, worker, and provider-contract
 integration tests are included.
+Sprint 4 now also includes a versioned, synthetic bilingual golden dataset for
+measuring feedback-analysis quality without sending customer data to an external
+provider.
 
 ## Solution structure
 
@@ -50,7 +53,9 @@ integration tests are included.
 - `PulsePilot.Api`: ASP.NET Core HTTP API
 - `PulsePilot.Worker`: durable background feedback analysis host
 - `PulsePilot.Web`: Next.js App Router frontend and secure backend gateway
+- `evaluation`: versioned AI evaluation datasets, manifests, and JSON schemas
 - `PulsePilot.UnitTests`: domain and application tests
+- `PulsePilot.Worker.UnitTests`: background worker host tests
 - `PulsePilot.IntegrationTests`: API and infrastructure tests
 
 ## Build
@@ -91,6 +96,15 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 Use `-SkipImageBuild` for a faster rerun when the application images are already
 current. The script always removes its temporary containers, network, and volume.
+
+## AI evaluation dataset
+
+The Task 36 golden dataset contains 60 synthetic feedback-analysis cases: 30 in
+English and 30 in Turkish. It covers clear, mixed, ambiguous, noisy, adversarial,
+synthetic-PII, and minimal-input scenarios while remaining deterministic and
+provider-free in CI. Its contract, data policy, and versioning rules are
+documented in `evaluation/README.md`. Provider execution and scoring belong to
+Task 37.
 
 ## Docker setup
 

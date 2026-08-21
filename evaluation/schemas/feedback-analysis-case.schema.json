@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pulsepilot.ai/schemas/evaluation/feedback-analysis-case.v1.json",
+  "title": "PulsePilot feedback analysis evaluation case v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "language",
+    "scenario",
+    "input",
+    "expected",
+    "tags"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^fa-(en|tr)-[a-z0-9-]+-[0-9]{3}$"
+    },
+    "language": {
+      "enum": ["en", "tr"]
+    },
+    "scenario": {
+      "enum": [
+        "clear_signal",
+        "mixed_signal",
+        "ambiguous",
+        "noisy",
+        "adversarial",
+        "synthetic_pii",
+        "minimal"
+      ]
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "content", "source"],
+      "properties": {
+        "title": {
+          "type": ["string", "null"],
+          "maxLength": 200
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "source": {
+          "enum": ["Manual", "Email", "Support", "Survey", "Api", "AppReview"]
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "category",
+        "component",
+        "severity",
+        "sentiment",
+        "requiredSummaryConcepts",
+        "requiredActionConcepts",
+        "minimumConfidence"
+      ],
+      "properties": {
+        "category": { "$ref": "#/$defs/categoryExpectation" },
+        "component": { "$ref": "#/$defs/componentExpectation" },
+        "severity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimum", "maximum"],
+          "properties": {
+            "minimum": { "type": "integer", "minimum": 1, "maximum": 5 },
+            "maximum": { "type": "integer", "minimum": 1, "maximum": 5 }
+          }
+        },
+        "sentiment": { "$ref": "#/$defs/sentimentExpectation" },
+        "requiredSummaryConcepts": { "$ref": "#/$defs/concepts" },
+        "requiredActionConcepts": { "$ref": "#/$defs/concepts" },
+        "minimumConfidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$"
+      }
+    }
+  },
+  "$defs": {
+    "categoryExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preferred", "accepted"],
+      "properties": {
+        "preferred": {
+          "enum": ["Bug", "FeatureRequest", "Complaint", "Question", "Praise", "Other"]
+        },
+        "accepted": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["Bug", "FeatureRequest", "Complaint", "Question", "Praise", "Other"]
+          }
+        }
+      }
+    },
+    "componentExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preferred", "accepted"],
+      "properties": {
+        "preferred": {
+          "enum": ["Payments", "Authentication", "Dashboard", "Reporting", "Mobile", "Api", "Performance", "General"]
+        },
+        "accepted": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["Payments", "Authentication", "Dashboard", "Reporting", "Mobile", "Api", "Performance", "General"]
+          }
+        }
+      }
+    },
+    "sentimentExpectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preferred", "accepted"],
+      "properties": {
+        "preferred": { "enum": ["Positive", "Neutral", "Negative"] },
+        "accepted": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["Positive", "Neutral", "Negative"] }
+        }
+      }
+    },
+    "concepts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 80
+      }
+    }
+  }
+}

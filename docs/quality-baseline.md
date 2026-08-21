@@ -1,7 +1,8 @@
 # Quality baseline
 
 This document records the Sprint 4 quality baseline established in Task 34 and
-ratcheted in Task 35. It is a regression floor, not the final coverage target.
+ratcheted in Tasks 35 and 36. It is a regression floor, not the final coverage
+target.
 
 ## Reproduce the baseline
 
@@ -34,15 +35,15 @@ Use `-SkipImageBuild` only when the application images are already current. The
 script tears down its containers, network, and PostgreSQL volume even when a test
 fails.
 
-## Task 35 measured baseline
+## Current measured baseline
 
-Captured on 2026-08-14 in Release configuration with .NET SDK 10.0.303. All 256
+Captured on 2026-08-21 in Release configuration with .NET SDK 10.0.303. All 259
 quality-baseline tests and both Playwright acceptance scenarios passed; none were
 skipped.
 
 | Suite | Tests | Line coverage | Branch coverage | Function coverage | Statement coverage |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| .NET unit | 122 | 69.34% | 75.63% | n/a | n/a |
+| .NET unit | 125 | 69.34% | 75.63% | n/a | n/a |
 | .NET Worker unit | 2 | 100.00% | 100.00% | n/a | n/a |
 | .NET integration | 81 | 92.65% | 57.85% | n/a | n/a |
 | Web unit/component | 51 | 38.90% | 80.10% | 68.45% | 38.90% |
@@ -56,6 +57,11 @@ component tests, and a real Chromium workspace journey. Compared with the Task
 34 starting point, the quality suite grew from 236 to 256 tests and web line
 coverage rose from 21.83% to 38.90%.
 
+Task 36 added three deterministic dataset-contract tests and ratcheted the
+quality suite from 256 to 259 tests. The tests validate the 60-case bilingual AI
+evaluation dataset without making provider calls, so product-code coverage is
+unchanged by design.
+
 ## Regression floors
 
 `quality-gates.json` contains deliberately conservative, whole-percentage floors
@@ -64,7 +70,7 @@ filtering of test cases, while coverage floors prevent meaningful regressions.
 
 | Suite | Minimum tests | Minimum lines | Minimum branches | Minimum functions | Minimum statements |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| .NET unit | 122 | 69% | 75% | n/a | n/a |
+| .NET unit | 125 | 69% | 75% | n/a | n/a |
 | .NET Worker unit | 2 | 100% | 100% | n/a | n/a |
 | .NET integration | 81 | 92% | 57% | n/a | n/a |
 | Web unit/component | 51 | 38% | 80% | 68% | 38% |
@@ -89,7 +95,7 @@ only move upward as coverage improves.
 - Integration tests use disposable PostgreSQL Testcontainers and make no external
   AI provider calls.
 
-## Remaining priorities after Task 35
+## Remaining priorities after Task 36
 
 - Server-rendered page/data modules and the larger dashboard, feedback, backlog,
   and actions views still have limited direct unit coverage; the main workspace
@@ -101,3 +107,6 @@ only move upward as coverage improves.
 - Branch coverage trails line coverage in the integration suite, so negative and
   authorization paths need targeted assertions rather than additional happy-path
   volume alone.
+- Task 37 must run the versioned golden dataset against a configured provider and
+  report strict/tolerant accuracy, text-concept recall, contract validity,
+  latency, and cost without weakening the deterministic CI baseline.

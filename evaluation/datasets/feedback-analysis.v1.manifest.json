@@ -1,0 +1,25 @@
+{
+  "name": "pulsepilot-feedback-analysis",
+  "version": "1.0.0",
+  "schemaVersion": "1.0",
+  "file": "feedback-analysis.v1.jsonl",
+  "caseCount": 60,
+  "languages": {
+    "en": 30,
+    "tr": 30
+  },
+  "scenarios": {
+    "clear_signal": 24,
+    "mixed_signal": 8,
+    "ambiguous": 8,
+    "noisy": 6,
+    "adversarial": 6,
+    "synthetic_pii": 4,
+    "minimal": 4
+  },
+  "dataPolicy": {
+    "syntheticOnly": true,
+    "realCustomerDataAllowed": false,
+    "externalProviderCallsRequired": false
+  }
+}
