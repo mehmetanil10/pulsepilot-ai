@@ -1,0 +1,193 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  DOTNET_NOLOGO: "true"
+  NUGET_XMLDOC_MODE: skip
+
+jobs:
+  quality:
+    name: Quality baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.22.0
+          cache: npm
+          cache-dependency-path: src/PulsePilot.Web/package-lock.json
+
+      - name: Run quality and coverage gates
+        shell: pwsh
+        run: ./scripts/quality-baseline.ps1
+
+      - name: Verify .NET formatting
+        run: dotnet format PulsePilot.sln --verify-no-changes --no-restore
+
+      - name: Run web lint
+        run: npm --prefix src/PulsePilot.Web run lint
+
+      - name: Audit .NET dependencies
+        shell: pwsh
+        run: ./scripts/check-dotnet-vulnerabilities.ps1 -NoRestore
+
+      - name: Audit npm dependencies
+        run: npm --prefix src/PulsePilot.Web audit --audit-level=high
+
+      - name: Upload quality reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: quality-reports
+          path: |
+            artifacts/quality
+            artifacts/security/dotnet-vulnerabilities.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  containers:
+    name: Production containers
+    needs: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      IMAGE_TAG: ci-${{ github.sha }}
+      ASPNETCORE_ENVIRONMENT: Production
+      BIND_ADDRESS: 127.0.0.1
+      POSTGRES_DB: pulsepilot_ci
+      POSTGRES_USER: pulsepilot_ci
+      POSTGRES_PASSWORD: ci-only-postgres-password
+      JWT_ISSUER: PulsePilot.CI
+      JWT_AUDIENCE: PulsePilot.CI.Client
+      JWT_SECRET: ci-only-jwt-secret-with-at-least-32-bytes
+      OPENAI_ENABLED: "false"
+      OPENAI_API_KEY: ""
+      FEEDBACK_PROCESSING_ENABLED: "false"
+      SEED_DEMO_DATA: "false"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.22.0
+          cache: npm
+          cache-dependency-path: src/PulsePilot.Web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm --prefix src/PulsePilot.Web ci
+
+      - name: Install Chromium
+        run: npx --prefix src/PulsePilot.Web playwright install --with-deps chromium
+
+      - name: Set image metadata
+        shell: pwsh
+        run: |
+          "BUILD_CREATED=$([DateTimeOffset]::UtcNow.ToString('O'))" >> $env:GITHUB_ENV
+          "BUILD_REVISION=${{ github.sha }}" >> $env:GITHUB_ENV
+          "BUILD_VERSION=ci-${{ github.run_number }}" >> $env:GITHUB_ENV
+
+      - name: Build production images
+        id: build
+        run: docker compose build migration api worker web
+
+      - name: Validate container hardening
+        shell: pwsh
+        run: ./scripts/validate-container-hardening.ps1
+
+      - name: Run browser acceptance journey
+        shell: pwsh
+        run: ./scripts/e2e-acceptance.ps1 -SkipImageBuild -ImageTag $env:IMAGE_TAG
+
+      - name: Prepare security reports
+        if: always()
+        run: mkdir -p artifacts/security
+
+      - name: Scan API image
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: pulsepilot-api:${{ env.IMAGE_TAG }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          format: sarif
+          output: artifacts/security/trivy-api.sarif
+          exit-code: "1"
+
+      - name: Scan migration image
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: pulsepilot-migration:${{ env.IMAGE_TAG }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          format: sarif
+          output: artifacts/security/trivy-migration.sarif
+          exit-code: "1"
+
+      - name: Scan Worker image
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: pulsepilot-worker:${{ env.IMAGE_TAG }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          format: sarif
+          output: artifacts/security/trivy-worker.sarif
+          exit-code: "1"
+
+      - name: Scan Web image
+        if: ${{ always() && steps.build.outcome == 'success' }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: pulsepilot-web:${{ env.IMAGE_TAG }}
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          format: sarif
+          output: artifacts/security/trivy-web.sarif
+          exit-code: "1"
+
+      - name: Upload container and E2E reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: container-security-and-e2e-reports
+          path: |
+            artifacts/e2e
+            artifacts/security/trivy-*.sarif
+          if-no-files-found: warn
+          retention-days: 14

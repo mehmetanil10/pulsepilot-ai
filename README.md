@@ -1,5 +1,7 @@
 # PulsePilot AI
 
+[![CI](https://github.com/mehmetanil10/pulsepilot-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/mehmetanil10/pulsepilot-ai/actions/workflows/ci.yml)
+
 PulsePilot AI is an AI-driven product feedback and engineering copilot for SaaS
 teams. It is designed to analyze feedback, detect related reports, prioritize
 issues, and keep critical actions behind human approval.
@@ -101,6 +103,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
 
 Use `-SkipImageBuild` for a faster rerun when the application images are already
 current. The script always removes its temporary containers, network, and volume.
+
+## Continuous integration
+
+GitHub Actions runs the complete quality baseline first, then builds and
+inspects the production images, completes the Chromium acceptance journey, and
+uses Trivy to reject fixable critical/high container vulnerabilities. NuGet and
+npm advisory gates run independently, reports are retained as workflow
+artifacts, and every Action is pinned to an immutable commit SHA.
+
+Dependabot checks Actions, NuGet, npm, and Docker dependencies weekly. Pipeline
+structure, permissions, artifacts, and the recommended `main` branch protection
+checks are documented in [`docs/ci-pipeline.md`](docs/ci-pipeline.md).
 
 ## OpenTelemetry
 

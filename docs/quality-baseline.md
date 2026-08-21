@@ -45,7 +45,7 @@ skipped.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | .NET unit | 149 | 70.98% | 78.34% | n/a | n/a |
 | .NET Worker unit | 2 | 100.00% | 100.00% | n/a | n/a |
-| .NET integration | 99 | 93.55% | 61.89% | n/a | n/a |
+| .NET integration | 99 | 93.55% | 61.07% | n/a | n/a |
 | Web unit/component | 51 | 38.90% | 80.10% | 68.45% | 38.90% |
 | Browser acceptance | 2 | n/a | n/a | n/a | n/a |
 
@@ -109,6 +109,13 @@ image inspector protects non-root users, isolated networks, loopback ports,
 read-only roots, dropped capabilities, PID limits, OCI metadata, exec-form
 health checks, and the absence of embedded secret environment variables.
 
+Task 44 keeps the measured test and coverage baseline unchanged and makes it a
+GitHub Actions merge gate. A second dependent job rebuilds the four production
+images, enforces the container contract, runs the Chromium journey, and rejects
+fixable critical/high image vulnerabilities. NuGet and npm advisory checks,
+immutable Action references, short-lived diagnostic artifacts, least-privilege
+workflow permissions, and weekly Dependabot review complete the CI baseline.
+
 ## Regression floors
 
 `quality-gates.json` contains deliberately conservative, whole-percentage floors
@@ -119,7 +126,7 @@ filtering of test cases, while coverage floors prevent meaningful regressions.
 | --- | ---: | ---: | ---: | ---: | ---: |
 | .NET unit | 149 | 70% | 78% | n/a | n/a |
 | .NET Worker unit | 2 | 100% | 100% | n/a | n/a |
-| .NET integration | 99 | 93% | 60% | n/a | n/a |
+| .NET integration | 99 | 93% | 61% | n/a | n/a |
 | Web unit/component | 51 | 38% | 80% | 68% | 38% |
 
 A failed command, failed test, missing report, lower test count, or coverage
@@ -142,7 +149,7 @@ only move upward as coverage improves.
 - Integration tests use disposable PostgreSQL Testcontainers and make no external
   AI provider calls.
 
-## Remaining priorities after Task 43
+## Remaining priorities after Task 44
 
 - Server-rendered page/data modules and the larger dashboard, feedback, backlog,
   and actions views still have limited direct unit coverage; the main workspace
@@ -162,6 +169,5 @@ only move upward as coverage improves.
   unsent customer-response draft independently from the immutable evaluation
   dataset.
 - The local load baseline is intentionally not a universal service-level
-  objective. Task 43 must repeat it against the hardened production containers,
-  and Task 45 must establish environment-specific latency and capacity targets
-  behind the deployed edge proxy.
+  objective. Task 45 must establish environment-specific latency and capacity
+  targets behind the deployed edge proxy.

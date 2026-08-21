@@ -1,0 +1,67 @@
+# Continuous integration pipeline
+
+Sprint 4 Task 44 turns the local quality and container contracts into required,
+repeatable GitHub Actions evidence. The workflow runs on pushes and pull
+requests targeting `main`, supports manual dispatch, cancels superseded runs on
+the same ref, and grants only read access to repository contents.
+
+## Quality baseline job
+
+The `Quality baseline` job runs on Ubuntu 24.04 with the repository-pinned .NET
+SDK and Node.js 22.22.0. It:
+
+1. restores deterministic NuGet and npm dependencies;
+2. builds the complete Release solution;
+3. runs 149 core unit, 2 Worker unit, 99 PostgreSQL integration, and 51 Web
+   tests with the committed coverage floors;
+4. verifies .NET formatting and zero-warning ESLint output;
+5. queries NuGet advisories through machine-readable JSON and fails on any
+   vulnerable direct or transitive package;
+6. runs the full npm advisory gate at high severity;
+7. uploads TRX, Cobertura, V8, and vulnerability reports for 14 days.
+
+No real provider key is configured and no external AI request is made.
+Integration databases are disposable Testcontainers instances.
+
+## Production container job
+
+The `Production containers` job starts only after the quality job passes. It:
+
+1. builds the digest-pinned API, migration, Worker, and Web images with commit,
+   run, and creation metadata;
+2. executes the Compose/image hardening validator;
+3. starts the isolated production stack and completes the two-scenario Chromium
+   acceptance journey;
+4. retains Playwright traces, screenshots, video, HTML output, and Compose logs
+   when failures occur;
+5. scans every final image with Trivy and fails for fixable critical or high
+   vulnerabilities;
+6. uploads the SARIF and E2E evidence for 14 days.
+
+The job uses synthetic, run-local database and JWT values. They are not product
+credentials and production secrets are never required by CI.
+
+## Supply-chain controls
+
+- Every referenced Action is pinned to a full commit SHA, with its release tag
+  retained as a review comment.
+- Workflow permissions default to `contents: read`; no package, deployment,
+  pull-request, identity-token, or security-event write permission is granted.
+- Dependabot checks GitHub Actions, NuGet, npm, root Docker, and Web Docker
+  dependencies weekly and groups ecosystem updates for review.
+- The job produces artifacts but does not publish images or deploy. Registry
+  authentication, provenance/attestation, environment approval, and cloud
+  rollout belong to Task 45's release/deployment boundary.
+
+## Repository setting
+
+After the first successful run, configure the `main` branch ruleset in GitHub to
+require these status checks before merge:
+
+- `Quality baseline`
+- `Production containers`
+
+Also require pull requests, block force pushes and branch deletion, and dismiss
+stale approvals when protected files change. Repository rules are an external
+administrative setting and therefore are documented rather than mutated by the
+workflow.

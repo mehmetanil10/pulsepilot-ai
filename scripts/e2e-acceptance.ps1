@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [switch]$SkipImageBuild
+    [switch]$SkipImageBuild,
+    [ValidateNotNullOrEmpty()]
+    [string]$ImageTag = "e2e"
 )
 
 Set-StrictMode -Version Latest
@@ -8,7 +10,8 @@ $ErrorActionPreference = "Stop"
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $webRoot = Join-Path $repositoryRoot "src/PulsePilot.Web"
-$projectName = "pulsepilot-task35-e2e"
+$projectName = "pulsepilot-e2e"
+$artifactRoot = Join-Path $repositoryRoot "artifacts/e2e"
 
 function Invoke-CheckedCommand {
     param(
@@ -23,7 +26,7 @@ function Invoke-CheckedCommand {
     }
 }
 
-$env:IMAGE_TAG = "task35-e2e"
+$env:IMAGE_TAG = $ImageTag
 $env:API_PORT = "18035"
 $env:WEB_PORT = "13035"
 $env:POSTGRES_PORT = "15435"
@@ -59,11 +62,20 @@ if (-not $SkipImageBuild) {
     $composeArguments += "--build"
 }
 
+$succeeded = $false
 try {
     Invoke-CheckedCommand "docker" $composeArguments
     Invoke-CheckedCommand "npm" @("--prefix", $webRoot, "run", "test:e2e")
+    $succeeded = $true
 }
 finally {
+    if (-not $succeeded) {
+        New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
+        $logPath = Join-Path $artifactRoot "docker-compose.log"
+        & docker compose --project-name $projectName logs --no-color 2>&1 |
+            Set-Content -LiteralPath $logPath -Encoding utf8
+    }
+
     Write-Host "> docker compose --project-name $projectName down --volumes --remove-orphans" -ForegroundColor DarkGray
     & docker compose --project-name $projectName down --volumes --remove-orphans | Out-Host
 }

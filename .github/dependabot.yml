@@ -1,0 +1,46 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dotnet:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /src/PulsePilot.Web
+    schedule:
+      interval: weekly
+    groups:
+      web:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      dotnet-images:
+        patterns:
+          - "*"
+
+  - package-ecosystem: docker
+    directory: /src/PulsePilot.Web
+    schedule:
+      interval: weekly
+    groups:
+      web-images:
+        patterns:
+          - "*"
