@@ -29,12 +29,14 @@ The `Production containers` job starts only after the quality job passes. It:
 
 1. builds the digest-pinned API, migration, Worker, and Web images with commit,
    run, and creation metadata; builds are deliberately sequential to stay below
-   GitHub-hosted runner memory limits and expose service-specific failures;
+   GitHub-hosted runner memory limits, and Next.js page generation is capped at
+   two workers;
 2. executes the Compose/image hardening validator;
 3. starts the isolated production stack and completes the two-scenario Chromium
    acceptance journey;
 4. retains Playwright traces, screenshots, video, HTML output, and Compose logs
-   when failures occur;
+   when failures occur; plain-text image build logs and their final error context
+   are retained independently;
 5. scans every final image with Trivy and fails for fixable critical or high
    vulnerabilities;
 6. uploads the SARIF and E2E evidence for 14 days.

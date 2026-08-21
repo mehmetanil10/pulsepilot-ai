@@ -114,17 +114,21 @@ jobs:
           "BUILD_VERSION=ci-${{ github.run_number }}" >> $env:GITHUB_ENV
 
       - name: Build migration image
-        run: docker compose build --progress plain migration
+        shell: pwsh
+        run: ./scripts/build-container-image.ps1 -Service migration
 
       - name: Build API image
-        run: docker compose build --progress plain api
+        shell: pwsh
+        run: ./scripts/build-container-image.ps1 -Service api
 
       - name: Build Worker image
-        run: docker compose build --progress plain worker
+        shell: pwsh
+        run: ./scripts/build-container-image.ps1 -Service worker
 
       - name: Build Web image
         id: build
-        run: docker compose build --progress plain web
+        shell: pwsh
+        run: ./scripts/build-container-image.ps1 -Service web
 
       - name: Validate container hardening
         shell: pwsh
@@ -196,6 +200,7 @@ jobs:
         with:
           name: container-security-and-e2e-reports
           path: |
+            artifacts/container-build
             artifacts/e2e
             artifacts/security/trivy-*.sarif
           if-no-files-found: warn
