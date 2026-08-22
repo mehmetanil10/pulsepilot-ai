@@ -135,7 +135,6 @@ services:
     dockerContext: ./src/PulsePilot.Web
     autoDeployTrigger: checksPass
     healthCheckPath: /api/health
-    maxShutdownDelaySeconds: 30
     envVars:
       - key: PORT
         value: "3000"
