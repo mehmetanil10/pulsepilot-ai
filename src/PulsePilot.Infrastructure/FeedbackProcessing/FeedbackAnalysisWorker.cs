@@ -1,8 +1,11 @@
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.FeedbackProcessing;
 
-namespace PulsePilot.Worker;
+namespace PulsePilot.Infrastructure.FeedbackProcessing;
 
 public sealed class FeedbackAnalysisWorker(
     IServiceScopeFactory scopeFactory,

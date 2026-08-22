@@ -118,24 +118,25 @@ checks are documented in [`docs/ci-pipeline.md`](docs/ci-pipeline.md).
 
 ## Cloud deployment
 
-`render.yaml` defines the portfolio deployment in Render's Frankfurt region: a
-public Next.js Web service, private ASP.NET Core API, continuously running .NET
-Worker, and private PostgreSQL 17 database with pgvector. Render deploys only
-after the linked GitHub checks pass, runs migration and deterministic demo seed
-as the API pre-deploy contract, generates the JWT secret, and prompts for the
-demo password and OpenAI key instead of storing them in Git.
+`render.yaml` defines a zero-platform-cost portfolio deployment in Render's
+Frankfurt region: free Next.js and ASP.NET Core Web services plus a private free
+PostgreSQL 17 database with pgvector. The API hosts feedback processing in its
+own process for this demo profile; Docker Compose retains the separate Worker
+used by the production-style topology. Render deploys only after linked GitHub
+checks pass, generates the JWT secret, and prompts for the demo password and
+OpenAI key instead of storing them in Git.
 
-The public demo remains read-only from an infrastructure perspective: browsers
-cannot address the API or PostgreSQL directly. After deployment, verify the URL
-without mutating demo data:
+The Web server calls the API's managed public HTTPS origin, while PostgreSQL
+remains private. After deployment, verify the Web URL without mutating demo
+data:
 
 ```powershell
 ./scripts/smoke-deployment.ps1 `
   -BaseUrl https://your-service.onrender.com
 ```
 
-The topology, current free/paid plan boundary, first-deploy steps, secret
-rotation, rollback, and live demo journey are documented in
+The free-tier constraints, first-deploy steps, secret rotation, rollback, and
+live demo journey are documented in
 [`docs/cloud-deployment.md`](docs/cloud-deployment.md).
 
 ## OpenTelemetry

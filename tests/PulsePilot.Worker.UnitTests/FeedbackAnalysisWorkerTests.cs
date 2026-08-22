@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using PulsePilot.Application.Abstractions.Persistence;
 using PulsePilot.Application.Common.Exceptions;
 using PulsePilot.Application.FeedbackProcessing;
-using PulsePilot.Worker;
+using PulsePilot.Infrastructure.FeedbackProcessing;
 
 namespace PulsePilot.Worker.UnitTests;
 

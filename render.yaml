@@ -1,19 +1,15 @@
 # yaml-language-server: $schema=https://render.com/schema/render.yaml.json
 
 services:
-  - type: pserv
+  - type: web
     name: pulsepilot-api
     runtime: docker
-    plan: starter
+    plan: free
     region: frankfurt
     dockerfilePath: ./Dockerfile
     dockerContext: .
     autoDeployTrigger: checksPass
-    preDeployCommand: >-
-      dotnet PulsePilot.Api.dll
-      --Database:RunMigrations=true
-      --Seed:Run=true
-    maxShutdownDelaySeconds: 30
+    healthCheckPath: /health/ready
     envVars:
       - key: PORT
         value: "8080"
@@ -26,9 +22,11 @@ services:
           name: pulsepilot-postgres
           property: connectionString
       - key: Database__RunMigrations
+        value: "true"
+      - key: Database__ExitAfterInitialization
         value: "false"
       - key: Seed__Run
-        value: "false"
+        value: "true"
       - key: Seed__Email
         value: demo@pulsepilot.ai
       - key: Seed__Password
@@ -41,54 +39,6 @@ services:
         value: PulsePilot.Web
       - key: Jwt__Secret
         generateValue: true
-      - key: OpenAI__Enabled
-        value: "true"
-      - key: OpenAI__ApiKey
-        sync: false
-      - key: OpenAI__Model
-        value: gpt-5.6-luna
-      - key: OpenAI__EmbeddingModel
-        value: text-embedding-3-small
-      - key: OpenAI__EmbeddingDimensions
-        value: "1536"
-      - key: OpenAI__MaxOutputTokenCount
-        value: "1000"
-      - key: OpenAI__NetworkTimeoutSeconds
-        value: "30"
-      - key: OpenTelemetry__OtlpEnabled
-        value: "false"
-      - key: ApiProtection__RateLimitingEnabled
-        value: "true"
-      - key: ApiProtection__GeneralPermitLimit
-        value: "240"
-      - key: ApiProtection__AuthenticationPermitLimit
-        value: "10"
-      - key: ApiProtection__AiPermitLimit
-        value: "20"
-      - key: ApiProtection__WindowSeconds
-        value: "60"
-      - key: ApiProtection__QueueLimit
-        value: "0"
-      - key: ApiProtection__MaxRequestBodyBytes
-        value: "65536"
-
-  - type: worker
-    name: pulsepilot-worker
-    runtime: docker
-    plan: starter
-    region: frankfurt
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    dockerCommand: dotnet /worker/PulsePilot.Worker.dll
-    autoDeployTrigger: checksPass
-    maxShutdownDelaySeconds: 60
-    envVars:
-      - key: ASPNETCORE_ENVIRONMENT
-        value: Production
-      - key: ConnectionStrings__Database
-        fromDatabase:
-          name: pulsepilot-postgres
-          property: connectionString
       - key: OpenAI__Enabled
         value: "true"
       - key: OpenAI__ApiKey
@@ -125,6 +75,20 @@ services:
         value: "0.2"
       - key: FeedbackProcessing__MaxRecoveredPerSweep
         value: "100"
+      - key: ApiProtection__RateLimitingEnabled
+        value: "true"
+      - key: ApiProtection__GeneralPermitLimit
+        value: "240"
+      - key: ApiProtection__AuthenticationPermitLimit
+        value: "10"
+      - key: ApiProtection__AiPermitLimit
+        value: "20"
+      - key: ApiProtection__WindowSeconds
+        value: "60"
+      - key: ApiProtection__QueueLimit
+        value: "0"
+      - key: ApiProtection__MaxRequestBodyBytes
+        value: "65536"
 
   - type: web
     name: pulsepilot-web
@@ -146,9 +110,9 @@ services:
         value: "1"
       - key: PULSEPILOT_API_URL
         fromService:
-          type: pserv
+          type: web
           name: pulsepilot-api
-          property: hostport
+          envVarKey: RENDER_EXTERNAL_URL
 
 databases:
   - name: pulsepilot-postgres

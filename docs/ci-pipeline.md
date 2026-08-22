@@ -32,8 +32,8 @@ The `Production containers` job starts only after the quality job passes. It:
    GitHub-hosted runner memory limits, and Next.js page generation is capped at
    two workers; the Web runtime also refreshes Alpine security packages and
    removes package managers that are unnecessary after the standalone build;
-   CI additionally builds the combined Render API/Worker artifact that the
-   platform creates from the Dockerfile's default stage;
+   CI additionally builds the Render free-demo API artifact that the platform
+   creates from the Dockerfile's default stage;
 2. executes the Compose/image hardening validator;
 3. starts the isolated production stack and completes the two-scenario Chromium
    acceptance journey;

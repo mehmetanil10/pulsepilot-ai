@@ -13,6 +13,7 @@ using PulsePilot.Api.Protection;
 using PulsePilot.Api.Validation;
 using PulsePilot.Application;
 using PulsePilot.Infrastructure;
+using PulsePilot.Infrastructure.FeedbackProcessing;
 using PulsePilot.Infrastructure.Observability;
 using PulsePilot.Infrastructure.Persistence;
 using PulsePilot.Infrastructure.Persistence.Seeding;
@@ -28,6 +29,7 @@ builder.Services.AddSerilog((services, loggerConfiguration) => loggerConfigurati
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddFeedbackAnalysisWorker(builder.Configuration);
 builder.Services.AddPulsePilotOpenTelemetry(
     builder.Configuration,
     serviceName: "PulsePilot.Api",
@@ -94,6 +96,9 @@ var app = builder.Build();
 
 var runMigrations = app.Configuration.GetValue<bool>("Database:RunMigrations");
 var runDemoSeed = app.Configuration.GetValue<bool>($"{DemoSeedOptions.SectionName}:Run");
+var exitAfterInitialization = app.Configuration.GetValue(
+    "Database:ExitAfterInitialization",
+    true);
 
 if (runMigrations || runDemoSeed)
 {
@@ -104,8 +109,11 @@ if (runMigrations || runDemoSeed)
         await app.SeedDemoDataAsync();
     }
 
-    await app.DisposeAsync();
-    return;
+    if (exitAfterInitialization)
+    {
+        await app.DisposeAsync();
+        return;
+    }
 }
 
 app.UseSerilogRequestLogging();

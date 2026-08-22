@@ -104,9 +104,7 @@ COPY --from=worker-publish --chown=app:app /app/worker ./
 
 ENTRYPOINT ["dotnet", "PulsePilot.Worker.dll"]
 
-# Render builds the final Dockerfile stage and uses one immutable artifact for
-# the private API, its pre-deploy migration, and the background worker. Compose
-# continues to target the smaller role-specific stages above.
+# Render builds the final Dockerfile stage for the free demo API. The API hosts
+# feedback processing in-process there, while Compose continues to use the
+# separate production-style API and Worker stages above.
 FROM final AS render-final
-
-COPY --from=worker-publish --chown=app:app /app/worker /worker

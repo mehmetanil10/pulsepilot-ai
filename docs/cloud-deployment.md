@@ -8,27 +8,31 @@ GitHub checks pass and builds the same production Dockerfiles exercised by CI.
 
 ```text
 Internet
-   |
-   | HTTPS / managed TLS
-   v
-PulsePilot Web (public, free web service)
-   |
-   | Render private network
-   v
-PulsePilot API (private, starter service) ----+
-                                               | private connection
-PulsePilot Worker (starter worker) ------------+----> Render PostgreSQL + pgvector
+   +---- HTTPS ----> PulsePilot Web (free web service)
+   |                      |
+   |                      | managed public HTTPS
+   |                      v
+   +--------------> PulsePilot API (free web service)
+                           |  + in-process feedback worker
+                           |
+                           | private datastore connection
+                           v
+                    Render PostgreSQL + pgvector (free)
 ```
 
 - Frankfurt keeps all application and database services in one region.
-- Only the Next.js service receives internet traffic. Browser authentication
-  and backend calls continue through its server-side proxy.
-- API startup and readiness remain independent from migration. The API's paid
-  pre-deploy command runs EF Core migrations and the idempotent 100-feedback
-  seed before a new revision becomes active.
-- API and Worker receive Render's internal PostgreSQL URL. The infrastructure
-  layer normalizes it to an Npgsql key/value connection string without logging
+- Browser authentication and backend calls continue through the Next.js
+  server-side proxy. The proxy receives the API's `RENDER_EXTERNAL_URL` through
+  a Blueprint service reference because free Web services cannot receive
+  private-network traffic.
+- The demo API runs EF Core migrations and the idempotent 100-feedback seed
+  during startup, then continues serving HTTP. The production-style migration
+  container still exits after initialization by default.
+- The API receives Render's internal PostgreSQL URL. The infrastructure layer
+  normalizes it to an Npgsql key/value connection string without logging
   credentials.
+- The demo API hosts the feedback analysis worker in-process. Docker Compose
+  and the role-specific production images retain the standalone Worker.
 - PostgreSQL has no public IP allow-list entries. The Blueprint explicitly pins
   PostgreSQL 17 because the application migrations and pgvector baseline are
   tested against that major version.
@@ -37,28 +41,30 @@ PulsePilot Worker (starter worker) ------------+----> Render PostgreSQL + pgvect
 
 ## Cost boundary
 
-The committed Blueprint selects a free public Web service, a free 1 GB
-PostgreSQL instance, and two Starter application instances for the private API
-and continuously running Worker. Render free PostgreSQL expires after 30 days
-and has no backups. Treat it as disposable portfolio data, then upgrade or
-replace it before expiry. The Render creation screen is the final cost approval
-point; syncing this file alone does not create resources.
+The committed Blueprint selects two free Web services and one free 1 GB
+PostgreSQL instance, so Render does not require a paid compute plan for the demo.
+OpenAI API usage remains separately billable to the provider key owner. Render
+free PostgreSQL expires after 30 days and has no backups. Treat it as disposable
+portfolio data, then recreate, upgrade, or replace it before expiry.
+
+Render grants a shared monthly pool of free instance hours. Both Web services
+sleep after 15 idle minutes and can take about a minute to wake. This profile is
+appropriate for a portfolio demo, not a production SLA.
 
 ## First deployment
 
 1. Sign in to Render and choose **New > Blueprint**.
 2. Connect `mehmetanil10/pulsepilot-ai`, select `main`, and keep
    `render.yaml` as the Blueprint path.
-3. Review the displayed monthly estimate. Do not create the resources unless
-   the Starter API and Worker cost is acceptable.
-4. Supply the prompted values for both services:
-   - `OpenAI__ApiKey`: the same restricted provider key for API and Worker;
+3. Confirm that both application services and PostgreSQL show the Free plan.
+4. Supply the two prompted API values:
+   - `OpenAI__ApiKey`: a restricted, project-scoped provider key;
    - `Seed__Password`: a unique 12-128 character demo password on the API.
-5. Apply the Blueprint. Render creates PostgreSQL first, builds the shared
-   API/Worker artifact, executes migration and seed, then activates API, Worker,
-   and Web.
-6. Record the Web `https://...onrender.com` URL. Do not expose the private API
-   address or place provider/database secrets in repository variables.
+5. Apply the Blueprint. Render creates PostgreSQL, builds both Web services, and
+   the API performs migration plus seed before accepting traffic.
+6. Record the Web `https://...onrender.com` URL. The API also has a managed
+   public origin required by the free topology; keep application endpoints
+   authenticated and never place provider/database secrets in the repository.
 
 The seeded login is `demo@pulsepilot.ai` plus the password entered during
 Blueprint creation. Change the password in Render and redeploy the API whenever
@@ -78,20 +84,21 @@ test verifies the Web health payload, login page, and response security headers
 without creating users or changing demo data.
 
 For the final product journey, sign in with the demo account, inspect the seeded
-dashboard, submit a manual feedback item, wait for Worker processing, review the
+dashboard, submit a manual feedback item, wait for analysis processing, review the
 analysis, approve its pending action, and confirm the resulting backlog item.
 
 ## Operational notes
 
-- A free Web instance sleeps after 15 idle minutes, so the first request can
-  take about a minute. The private API and Worker remain on paid instances.
+- Both free Web instances sleep after 15 idle minutes. The first Web request and
+  its first API call can therefore each incur a cold-start delay.
 - Automatic deployment uses `checksPass`; a failing GitHub CI run does not roll
-  out. Render preserves the last successful revision when a build or pre-deploy
-  command fails.
-- Roll back the Web, API, and Worker from their Render Events pages to the same
-  Git commit. Database migrations are forward-only; take a database backup
-  before any future destructive schema change.
+  out. Render preserves the last successful revision when a build fails.
+- Roll back Web and API from their Render Events pages to the same Git commit.
+  Database migrations are forward-only. The free database has no managed
+  backups, so avoid destructive migrations in this disposable demo profile.
 - OpenTelemetry export stays disabled until a managed OTLP endpoint and secret
   are selected. Render logs still receive structured, PII-redacted output.
 - The current portfolio topology is single-instance and deliberately avoids
-  Kubernetes, a public API edge, and multi-region state.
+  Kubernetes and multi-region state. Move the Worker back to its standalone
+  service and place the API on private paid compute before treating it as a
+  production deployment.
