@@ -6,6 +6,44 @@ PulsePilot AI is an AI-driven product feedback and engineering copilot for SaaS
 teams. It is designed to analyze feedback, detect related reports, prioritize
 issues, and keep critical actions behind human approval.
 
+## What PulsePilot demonstrates
+
+| Product capability | Engineering evidence |
+| --- | --- |
+| Structured feedback intelligence | Strict Responses API schemas, application validation and persisted analysis |
+| Related-report detection | PostgreSQL/pgvector cosine search plus category/component-aware clustering |
+| Explainable prioritization | Deterministic severity, frequency, impact and recency scoring |
+| Human-in-the-loop automation | Admin-only approval, idempotent tools and unsent customer-response drafts |
+| Grounded product copilot | Bounded orchestration with four allowlisted analytical tools |
+| Production discipline | Workspace isolation, PII redaction, OpenTelemetry, quality gates, hardened containers and CI security scans |
+
+## Product flow
+
+```mermaid
+flowchart LR
+    A[Feedback] --> B[Structured AI analysis]
+    B --> C[Semantic matches and clusters]
+    C --> D[Deterministic priority]
+    D --> E[Human review]
+    E -->|Approve| F[Backlog item or unsent draft]
+    C --> G[Grounded copilot and reports]
+```
+
+The model proposes; the application validates; an authorized human decides.
+Workspace identity always comes from authenticated backend context rather than
+model or request-body input.
+
+## Documentation
+
+- [Architecture and trust boundaries](docs/architecture.md)
+- [HTTP API reference](docs/api-reference.md)
+- [Cloud deployment and live demo](docs/cloud-deployment.md)
+- [Quality baseline](docs/quality-baseline.md)
+- [Performance and security baseline](docs/performance-security-baseline.md)
+- [Container hardening](docs/container-hardening.md)
+- [GitHub Actions pipeline](docs/ci-pipeline.md)
+- [AI evaluation dataset and runner](evaluation/README.md)
+
 ## Current status
 
 Sprint 1, Sprint 2, and Sprint 3 are complete, and Sprint 4 production hardening
