@@ -38,6 +38,7 @@ model or request-body input.
 - [Architecture and trust boundaries](docs/architecture.md)
 - [HTTP API reference](docs/api-reference.md)
 - [Cloud deployment and live demo](docs/cloud-deployment.md)
+- [Portfolio screenshots and demo recording](docs/demo-guide.md)
 - [Quality baseline](docs/quality-baseline.md)
 - [Performance and security baseline](docs/performance-security-baseline.md)
 - [Container hardening](docs/container-hardening.md)
@@ -137,6 +138,14 @@ with disposable ports, credentials, and PostgreSQL data:
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\e2e-acceptance.ps1
+```
+
+The seeded, read-only portfolio tour produces six real product screenshots and
+an ignored WebM recording without placing the demo password in Git or logs:
+
+```powershell
+$env:PULSEPILOT_DEMO_PASSWORD = "<your seeded demo password>"
+.\scripts\capture-demo.ps1
 ```
 
 Use `-SkipImageBuild` for a faster rerun when the application images are already
