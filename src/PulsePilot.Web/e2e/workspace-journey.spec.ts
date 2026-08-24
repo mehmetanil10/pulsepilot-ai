@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-test("anonymous workspace routes redirect to sign in", async ({ page }) => {
+test("anonymous visitors see the public product story while workspace routes remain protected", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", {
+    name: /From customer signals to accountable engineering action/i,
+  })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Explore the demo" }).first()).toHaveAttribute("href", "/login");
+
   await page.goto("/dashboard");
 
   await expect(page).toHaveURL(/\/login$/);
@@ -20,6 +28,11 @@ test("owner can register, ingest feedback, inspect workspace views, and sign out
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: "Good to see you, E2E." })).toBeVisible();
+
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "Open dashboard" }).first()).toBeVisible();
+  await page.getByRole("link", { name: "Open dashboard" }).first().click();
+  await expect(page).toHaveURL(/\/dashboard$/);
 
   const created = await page.evaluate(async (title) => {
     const response = await fetch("/api/backend/feedback", {

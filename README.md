@@ -48,12 +48,12 @@ model or request-body input.
 
 ## Current status
 
-Sprint 1, Sprint 2, and Sprint 3 are complete. Sprint 4 Tasks 34-44 and 46-48
-are complete; the public Task 45 deployment remains pending. The .NET 10
+Sprint 1, Sprint 2, and Sprint 3 are complete. Sprint 4 Tasks 34-44, 46-48, and
+bonus Task 49 are complete; the public Task 45 deployment remains pending. The .NET 10
 Clean Architecture foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, idempotent demo seed, and a Next.js 16 App Router frontend foundation are
-ready. The web app includes a responsive product shell, login and registration
+ready. The web app includes a public, responsive product landing page, a responsive product shell, login and registration
 flows, HttpOnly JWT sessions, an allowlisted same-origin API gateway, and a
 standalone production container. Its live dashboard now presents workspace-scoped
 KPIs, trending issue momentum, processing health, recent feedback, pending AI
@@ -141,7 +141,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass `
   -File .\scripts\e2e-acceptance.ps1
 ```
 
-The seeded, read-only portfolio tour produces six real product screenshots and
+The seeded, read-only portfolio tour produces seven real product screenshots and
 an ignored WebM recording without placing the demo password in Git or logs:
 
 ```powershell

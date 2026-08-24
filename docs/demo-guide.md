@@ -32,20 +32,25 @@ credential could have appeared on screen.
 
 ## Captured tour
 
-The automated tour signs in and records these read-only product views without
+The automated tour records these read-only product views without
 approving, rejecting, creating, or deleting anything:
 
-1. Dashboard KPIs, trend momentum, processing health, and category distribution.
-2. Searchable feedback library populated with deterministic synthetic signals.
-3. Feedback detail with structured analysis, cluster context, and related reports.
-4. Human-in-the-loop recommendation queue and its evidence boundary.
-5. Engineering backlog with traceability to approved recommendations.
-6. Workspace Copilot capability and safety boundaries.
+1. Public product landing page and its human-control promise.
+2. Dashboard KPIs, trend momentum, processing health, and category distribution.
+3. Searchable feedback library populated with deterministic synthetic signals.
+4. Feedback detail with structured analysis, cluster context, and related reports.
+5. Human-in-the-loop recommendation queue and its evidence boundary.
+6. Engineering backlog with traceability to approved recommendations.
+7. Workspace Copilot capability and safety boundaries.
 
 The stable recording is written to `artifacts/demo/pulsepilot-demo.webm`. Trim or
 voice over that file in a video editor; do not commit the exported video to Git.
 
 ## Screenshot gallery
+
+### Public product landing page
+
+![PulsePilot public product landing page](assets/screenshots/landing-page.png)
 
 ### Product intelligence dashboard
 
@@ -73,7 +78,8 @@ voice over that file in a video editor; do not commit the exported video to Git.
 
 ## Suggested 75-second narration
 
-- **0-10s:** “PulsePilot turns fragmented SaaS feedback into prioritized product
+- **0-10s:** Introduce the product promise on the public landing page: “PulsePilot
+  turns fragmented SaaS feedback into prioritized product
   intelligence while keeping consequential actions under human control.”
 - **10-23s:** Point out volume, trends, processing health, and category mix on the
   dashboard.

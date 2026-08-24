@@ -8,6 +8,12 @@ const screenshotRoot = path.resolve(__dirname, "../../../docs/assets/screenshots
 test("capture the seeded PulsePilot product tour", async ({ page }) => {
   test.skip(!demoPassword, "PULSEPILOT_DEMO_PASSWORD is required.");
 
+  await page.goto("/");
+  await expect(page.getByRole("heading", {
+    name: /From customer signals to accountable engineering action/i,
+  })).toBeVisible();
+  await capture(page, "landing-page.png");
+
   await page.goto("/login");
   await page.getByLabel("Work email").fill(demoEmail);
   await page.getByLabel("Password").fill(demoPassword!);
