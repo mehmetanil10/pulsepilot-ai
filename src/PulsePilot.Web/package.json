@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --reporter=default --reporter=json --outputFile=../../artifacts/quality/web-tests.json",
     "test:e2e": "playwright test",
-    "demo:capture": "playwright test --config=playwright.demo.config.ts"
+    "demo:capture": "playwright test --config=playwright.demo.config.ts",
+    "demo:capture:landing": "playwright test --config=playwright.landing-demo.config.ts"
   },
   "dependencies": {
     "next": "16.3.0",

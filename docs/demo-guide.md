@@ -46,6 +46,27 @@ approving, rejecting, creating, or deleting anything:
 The stable recording is written to `artifacts/demo/pulsepilot-demo.webm`. Trim or
 voice over that file in a video editor; do not commit the exported video to Git.
 
+## Landing page video
+
+The public landing story can be recorded independently without a demo account or
+password. Start the Web application, then run:
+
+```powershell
+./scripts/capture-landing-demo.ps1
+```
+
+The 1440 x 900 Chromium tour pauses on the hero, feedback workflow, live product
+views, human approval boundary, Copilot, architecture, release boundary, and
+final call to action. Its stable output is
+`artifacts/demo/pulsepilot-landing-demo.webm`. For a deployed origin, use:
+
+```powershell
+./scripts/capture-landing-demo.ps1 -BaseUrl https://your-service.onrender.com
+```
+
+The script rejects URLs containing a path, query, or fragment and never requires
+or reads a product credential.
+
 ## Screenshot gallery
 
 ### Public product landing page

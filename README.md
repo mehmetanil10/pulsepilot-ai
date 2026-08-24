@@ -149,6 +149,14 @@ $env:PULSEPILOT_DEMO_PASSWORD = "<your seeded demo password>"
 .\scripts\capture-demo.ps1
 ```
 
+The public landing page has a separate, credential-free 1440 x 900 recording
+that moves through the complete product story and writes an ignored shareable
+video to `artifacts/demo/pulsepilot-landing-demo.webm`:
+
+```powershell
+.\scripts\capture-landing-demo.ps1
+```
+
 Use `-SkipImageBuild` for a faster rerun when the application images are already
 current. The script always removes its temporary containers, network, and volume.
 
