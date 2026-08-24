@@ -39,6 +39,7 @@ model or request-body input.
 - [HTTP API reference](docs/api-reference.md)
 - [Cloud deployment and live demo](docs/cloud-deployment.md)
 - [Portfolio screenshots and demo recording](docs/demo-guide.md)
+- [Release readiness, known limitations, and roadmap](docs/release-readiness.md)
 - [Quality baseline](docs/quality-baseline.md)
 - [Performance and security baseline](docs/performance-security-baseline.md)
 - [Container hardening](docs/container-hardening.md)
@@ -47,8 +48,8 @@ model or request-body input.
 
 ## Current status
 
-Sprint 1, Sprint 2, and Sprint 3 are complete, and Sprint 4 production hardening
-is in progress. The .NET 10
+Sprint 1, Sprint 2, and Sprint 3 are complete. Sprint 4 Tasks 34-44 and 46-48
+are complete; the public Task 45 deployment remains pending. The .NET 10
 Clean Architecture foundation, core domain model, PostgreSQL persistence layer, JWT authentication,
 workspace-isolated Feedback CRUD, API observability baseline, Docker development
 stack, idempotent demo seed, and a Next.js 16 App Router frontend foundation are

@@ -155,15 +155,21 @@ only move upward as coverage improves.
 - Integration tests use disposable PostgreSQL Testcontainers and make no external
   AI provider calls.
 
-## Remaining priorities after Task 44
+Task 48 adds a separate populated-demo browser contract without changing the
+measured unit/integration counts or their coverage floors. It asserts the seeded
+30-day KPIs and trends, 100-signal library, structured analysis, two-item human
+review queue, traceable backlog item, Copilot safety boundary, and sign-out. The
+tour also regenerates the committed portfolio screenshots and ignored local video.
+
+## Remaining priorities after Task 48
 
 - Server-rendered page/data modules and the larger dashboard, feedback, backlog,
   and actions views still have limited direct unit coverage; the main workspace
   behavior is currently protected by the browser journey.
-- The browser suite covers authentication, feedback ingestion and inspection,
-  empty action/backlog states, safe Copilot failure, and sign-out. The expanded
-  seed now provides deterministic populated action-review and backlog data; a
-  browser journey that consumes that seeded state remains a targeted follow-up.
+- The isolated CI browser suite covers authentication, feedback ingestion and
+  inspection, empty action/backlog states, safe Copilot failure, and sign-out.
+  The separate Task 48 demo tour now covers populated seeded state; CI can adopt
+  it after a secret-safe seeded Compose fixture is introduced.
 - Branch coverage trails line coverage in the integration suite, so negative and
   authorization paths need targeted assertions rather than additional happy-path
   volume alone.
